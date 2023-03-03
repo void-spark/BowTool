@@ -23,7 +23,7 @@ import java.util.function.Predicate
 
 
 @OptIn(ExperimentalUnsignedTypes::class)
-class HelloApplication : Application() {
+class App : Application() {
 
 // Fake python scripts can output data to stdout, and let Java decode it.
 
@@ -168,7 +168,6 @@ class HelloApplication : Application() {
     }
 }
 
-
-fun main() {
-    Application.launch(HelloApplication::class.java)
+fun main(args: Array<String>) {
+    Application.launch(App::class.java, *args)
 }

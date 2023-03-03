@@ -44,7 +44,7 @@ detected_modules=`$JAVA_HOME/bin/jdeps \
   --ignore-missing-deps \
   --print-module-deps \
   --class-path "target/installer/input/libs/*" \
-    target/classes/org/bowparser/bowparser/HelloApplication.class`
+    target/classes/org/bowparser/bowparser/App.class`
 echo "detected modules: ${detected_modules}"
 
 
@@ -89,8 +89,8 @@ $JAVA_HOME/bin/jpackage \
 --type $INSTALLER_TYPE \
 --dest target/installer \
 --input target/installer/input/libs \
---name JPackageScriptFX \
---main-class org.bowparser.bowparser.HelloApplication \
+--name BowTool \
+--main-class org.bowparser.bowparser.AppLauncher \
 --main-jar ${MAIN_JAR} \
 --java-options -Xmx2048m \
 --runtime-image target/java-runtime \
