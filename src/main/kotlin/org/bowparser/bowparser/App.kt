@@ -35,7 +35,12 @@ class App : Application() {
         val mapper = ObjectMapper(YAMLFactory())
         mapper.registerModule(KotlinModule.Builder().build())
 
-        val config = Files.newBufferedReader(Paths.get("config.yml")).use {
+
+        val appConfigPath = Paths.get("app", "config.yml")
+        val localConfigPath = Paths.get("config.yml")
+        val configPath = if(Files.exists(appConfigPath)) appConfigPath else localConfigPath
+
+        val config = Files.newBufferedReader(configPath).use {
             mapper.readValue(it, Config::class.java)
         }
         println(config.toString())
@@ -44,12 +49,6 @@ class App : Application() {
         val deviceByInt = byInt(config.devices)
         val dataIdsByInt = byInt(config.dataIds)
         val commandsByInt = byInt(config.commands)
-
-
-//        val binary = true
-//        //val path = Paths.get("/home/cranphin/IdeaProjects/bowparser/error stb on service 1 2 3 4 5 4 3 2 1 on logo.txt")
-//        val path = Paths.get("/home/cranphin/ebike/raw_logs/special/LOG00002.TXT")
-//        //val path = Paths.get("/home/cranphin/ebike/raw_logs/LOG00046.TXT")
 
         val decoder = Decoder(commandsByInt, dataIdsByInt)
 
