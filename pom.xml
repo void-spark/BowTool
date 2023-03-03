@@ -125,7 +125,7 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>${basedir}/target/installer/input/libs</outputDirectory>
+                            <outputDirectory>${project.build.directory}/libs</outputDirectory>
                             <resources>
                                 <resource>
                                     <directory>.</directory>
