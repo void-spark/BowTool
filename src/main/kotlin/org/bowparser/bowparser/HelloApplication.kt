@@ -14,6 +14,7 @@ import javafx.scene.control.*
 import javafx.scene.layout.*
 import javafx.scene.paint.Color
 import javafx.scene.text.Font
+import javafx.stage.FileChooser
 import javafx.stage.Stage
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -24,13 +25,13 @@ import java.util.function.Predicate
 @OptIn(ExperimentalUnsignedTypes::class)
 class HelloApplication : Application() {
 
-    private val items = FXCollections.observableArrayList<Message>()
-    private val filter = FilteredList(items)
-    private val table = TableView(filter)
-
 // Fake python scripts can output data to stdout, and let Java decode it.
 
+
     override fun start(stage: Stage) {
+        val table = TableView(FXCollections.emptyObservableList<Message>())
+
+
         val mapper = ObjectMapper(YAMLFactory())
         mapper.registerModule(KotlinModule.Builder().build())
 
@@ -44,10 +45,20 @@ class HelloApplication : Application() {
         val dataIdsByInt = byInt(config.dataIds)
         val commandsByInt = byInt(config.commands)
 
+
+//        val binary = true
+//        //val path = Paths.get("/home/cranphin/IdeaProjects/bowparser/error stb on service 1 2 3 4 5 4 3 2 1 on logo.txt")
+//        val path = Paths.get("/home/cranphin/ebike/raw_logs/special/LOG00002.TXT")
+//        //val path = Paths.get("/home/cranphin/ebike/raw_logs/LOG00046.TXT")
+
         val decoder = Decoder(commandsByInt, dataIdsByInt)
 
-
         stage.title = "BOW decoder"
+
+        val fileChooser = FileChooser()
+
+        val openBinaryButton = Button("Open binary...")
+        val openHexButton = Button("Open hex...")
 
         val label = Label("BOW decoder")
         label.font = Font("Arial", 20.0)
@@ -61,6 +72,13 @@ class HelloApplication : Application() {
             col("decoded", 800.0) { msg -> decoder.decode(msg) }
         )
 
+
+        val buttonBox = HBox()
+        //buttonBox.padding = Insets(15.0, 12.0, 15.0, 12.0)
+        buttonBox.spacing = 10.0
+        buttonBox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
+        buttonBox.children.addAll(openBinaryButton, openHexButton)
+
         val hbox = HBox()
         hbox.padding = Insets(15.0, 12.0, 15.0, 12.0)
         hbox.spacing = 10.0
@@ -73,7 +91,7 @@ class HelloApplication : Application() {
 
 
         val vbox = VBox()
-        vbox.children.addAll(label, hbox)
+        vbox.children.addAll(label, buttonBox, hbox)
 
 
         val pane = BorderPane()
@@ -86,6 +104,40 @@ class HelloApplication : Application() {
         pane.top = vbox
         pane.center = table
 
+        val filterPredicate = Bindings.createObjectBinding({
+            Predicate<Message> { message ->
+                handoff.isSelected || !isType(message, 0x00)
+            }.and { message ->
+                ping.isSelected || !(isType(message, 0x03) || isType(message, 0x04))
+            }.and { message ->
+                buttonCheck.isSelected || !isCmd(message, 0x22)
+            }
+        }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty())
+
+
+        openBinaryButton.setOnAction { event ->
+            val file = fileChooser.showOpenDialog(stage)
+            if (file != null) {
+                val task = FileReaderTask(file.toPath(), true, deviceByInt, decoder)
+                val filter = FilteredList(task.getMessages())
+                filter.predicateProperty().bind(filterPredicate)
+                table.itemsProperty().set(filter)
+
+                Thread(task).start()
+            }
+        }
+
+        openHexButton.setOnAction { event ->
+            val file = fileChooser.showOpenDialog(stage)
+            if (file != null) {
+                val task = FileReaderTask(file.toPath(), false, deviceByInt, decoder)
+                val filter = FilteredList(task.getMessages())
+                filter.predicateProperty().bind(filterPredicate)
+                table.itemsProperty().set(filter)
+
+                Thread(task).start()
+            }
+        }
 
         stage.scene = Scene(pane)
         stage.show()
@@ -97,59 +149,7 @@ class HelloApplication : Application() {
         // Load file dialog of course
         // Caching of decoded messages? Most repeat. Key might be pair of messages
 
-        val binary = true
-        //val path = Paths.get("/home/cranphin/IdeaProjects/bowparser/error stb on service 1 2 3 4 5 4 3 2 1 on logo.txt")
-        val path = Paths.get("/home/cranphin/ebike/raw_logs/special/LOG00002.TXT")
-        //val path = Paths.get("/home/cranphin/ebike/raw_logs/LOG00046.TXT")
 
-        filter.predicateProperty().bind(
-            Bindings.createObjectBinding({
-                Predicate { message: Message ->
-                    (handoff.isSelected || !isType(message, 0x00)) &&
-                            (ping.isSelected || !(isType(message, 0x03) || isType(message, 0x04))) &&
-                            (buttonCheck.isSelected || !isCmd(message, 0x22))
-                }
-            }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty())
-        )
-
-
-        val parser = MessageParser({ message ->
-            var errors = ""
-            if (message.message.size != message.size!!.toInt()) {
-                errors += " SIZE MISMATCH"
-            }
-
-            if (CRC8().crc8Bow(message.message.dropLast(1)) != message.message.last()) {
-                errors += " CRC MISMATCH"
-            }
-
-            val decoded = decoder.decode(message)
-
-
-            // println()
-
-            print("tgt:${withName(message.target, deviceByInt, false)} typ:${message.type}")
-            print(
-                when (message.type.toInt()) {
-                    0x00 -> "        [${hex(message.message.take(1))}-${hex(message.message.slice(1 until 2))}-${hex(message.message.takeLast(1))}]"
-                    0x03, 0x04 -> " src:${withName(message.source, deviceByInt, false)} [${hex(message.message.take(1))}-${hex(message.message.slice(1 until 3))}-${hex(message.message.takeLast(1))}]"
-                    else -> " src:${withName(message.source, deviceByInt, false)} [${hex(message.message.take(1))}-${hex(message.message.slice(1 until 3))}-${
-                        hex(
-                            message.message.drop(3).dropLast(1)
-                        )
-                    }-${hex(message.message.takeLast(1))}] [${hex(message.message.drop(3).dropLast(1))}]"
-                }
-            )
-
-            println("$errors - $decoded")
-
-            items.add(message)
-        }, { message -> println("Incomplete: ${hex(message)}, crc:${hex(CRC8().crc8Bow(message.dropLast(1)))}") })
-
-        FileReader().readFile(path, binary) { byte ->
-            // print(hex(byte))
-            parser.feed(byte)
-        }
     }
 
     private fun col(header: String, width: Double, formatter: (Message) -> String): TableColumn<Message, String> {

@@ -3,7 +3,6 @@ package org.bowparser.bowparser
 import java.nio.file.Files
 import java.nio.file.Path
 
-@OptIn(ExperimentalUnsignedTypes::class)
 class FileReader {
 
     fun readFile(path: Path, binary: Boolean, handler: (byte: UByte) -> Unit) {
