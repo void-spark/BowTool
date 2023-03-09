@@ -24,6 +24,7 @@ dataIds:
     0x8e: Time
     0x99: Trip time
     0x9a: Max speed
+    0xd1: Motor serial#
 
 commands:
     0x01: MYSTERY BATTERY COMMAND 01
