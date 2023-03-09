@@ -1,9 +1,6 @@
 package org.bowparser.bowparser
 
 @OptIn(ExperimentalUnsignedTypes::class)
-data class Message constructor(val type: UByte, val target: UByte, val source: UByte?, val size: UByte?, val message: UByteArray)
-
-@OptIn(ExperimentalUnsignedTypes::class)
 class MessageParser(
     val handler: (
         message: Message
@@ -11,7 +8,6 @@ class MessageParser(
         message: UByteArray
     ) -> Unit
 ) {
-
     private var cnt = 0u
     private var target: UByte? = null
     private var source: UByte? = null
@@ -19,6 +15,7 @@ class MessageParser(
     private var size: UByte? = null
     private var message: UByteArray? = null
     private var escaping = false
+    private var last: Message? = null
 
     fun feed(
         inByte: UByte,
@@ -83,7 +80,9 @@ class MessageParser(
             cnt++
 
             if (cnt > 2u && cnt == size!!.toUInt()) {
-                handler(Message(type!!, target!!, source, size, message!!))
+                val newMsg = Message(type!!, target!!, source, size, message!!, last)
+                last = newMsg
+                handler(newMsg)
                 cnt = 0u
             }
         }

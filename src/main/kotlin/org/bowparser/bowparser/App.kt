@@ -86,8 +86,12 @@ class App : Application() {
         val handoff = CheckBox("HANDOFF")
         val ping = CheckBox("PING")
         val buttonCheck = CheckBox("Button Check")
-        hbox.children.addAll(handoff, ping, buttonCheck)
 
+        val motorCheck = CheckBox("Motor")
+        val displayCheck = CheckBox("Display")
+        val batteryCheck = CheckBox("Battery")
+
+        hbox.children.addAll(handoff, ping, buttonCheck, motorCheck, displayCheck, batteryCheck)
 
         val vbox = VBox()
         vbox.children.addAll(label, buttonBox, hbox)
@@ -103,16 +107,27 @@ class App : Application() {
         pane.top = vbox
         pane.center = table
 
+
+        motorCheck.isSelected = true
+        displayCheck.isSelected = true
+        batteryCheck.isSelected = true
+
         val filterPredicate = Bindings.createObjectBinding({
             Predicate<Message> { message ->
-                handoff.isSelected || !isType(message, 0x00)
+                handoff.isSelected || !message.isHandoff()
             }.and { message ->
-                ping.isSelected || !(isType(message, 0x03) || isType(message, 0x04))
+                ping.isSelected || !message.isPingOrPong()
             }.and { message ->
-                buttonCheck.isSelected || !isCmd(message, 0x22)
+                buttonCheck.isSelected || !message.isCmd(0x22)
+            }.and { message ->
+                motorCheck.isSelected || !(message.tgt() == 0x00 || message.src() == 0x00)
+            }.and { message ->
+                displayCheck.isSelected || !(message.tgt() == 0x0c || message.src() == 0x0c)
+            }.and { message ->
+                batteryCheck.isSelected || !(message.tgt() == 0x02 || message.src() == 0x02)
             }
-        }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty())
 
+        }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty(), motorCheck.selectedProperty(), displayCheck.selectedProperty(), batteryCheck.selectedProperty())
 
         openBinaryButton.setOnAction { event ->
             val file = fileChooser.showOpenDialog(stage)
@@ -156,14 +171,6 @@ class App : Application() {
         col.prefWidth = width
         col.setCellValueFactory { SimpleStringProperty(formatter.invoke(it.value)) }
         return col
-    }
-
-    private fun isType(message: Message, type: Int): Boolean {
-        return message.type.toInt() == type
-    }
-
-    private fun isCmd(message: Message, cmd: Int): Boolean {
-        return (isType(message, 0x01) || isType(message, 0x02)) && message.message[3].toInt() == cmd
     }
 }
 

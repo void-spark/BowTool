@@ -12,16 +12,9 @@ import java.nio.file.Path
 class FileReaderTask(private val path: Path, private val binary: Boolean, private val deviceByInt: Map<UByte, String>, private val decoder: Decoder) : Task<ObservableList<Message>>() {
 
     private val parser = MessageParser({ message ->
-        var errors = ""
-        if (message.message.size != message.size!!.toInt()) {
-            errors += " SIZE MISMATCH"
-        }
 
-        if (CRC8().crc8Bow(message.message.dropLast(1)) != message.message.last()) {
-            errors += " CRC MISMATCH"
-        }
-
-        val decoded = decoder.decode(message)
+        val errors = decoder.check(message)
+        val decoded = if (errors.isEmpty()) decoder.decode(message) else errors
 
 
         // println()
@@ -39,7 +32,7 @@ class FileReaderTask(private val path: Path, private val binary: Boolean, privat
             }
         )
 
-        println("$errors - $decoded")
+        println("$decoded")
 
         Platform.runLater { messages.get().add(message) }
     }, { message -> println("Incomplete: ${hex(message)}, crc:${hex(CRC8().crc8Bow(message.dropLast(1)))}") })
@@ -60,9 +53,13 @@ class FileReaderTask(private val path: Path, private val binary: Boolean, privat
 
     @Throws(Exception::class)
     override fun call(): ObservableList<Message> {
-        FileReader().readFile(path, binary) { byte ->
-            // print(hex(byte))
-            parser.feed(byte)
+        try {
+            FileReader().readFile(path, binary) { byte ->
+                // print(hex(byte))
+                parser.feed(byte)
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
         }
         return messages.get()
     }
