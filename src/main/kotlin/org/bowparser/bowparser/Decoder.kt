@@ -1,7 +1,5 @@
 package org.bowparser.bowparser
 
-import java.math.BigInteger
-
 @OptIn(ExperimentalUnsignedTypes::class)
 class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIdsByInt: Map<UByte, String>) {
 
@@ -117,16 +115,21 @@ class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIds
     }
 
     private fun createGetDataString(message: Message) = buildString {
-        val req = if (message.isReq()) message else message.previous
-        if (req != null && req.cmd() == message.cmd()) {
-            toReqParts(req.data()).forEach { reqPart -> append(reqPart) }
-        }
 
         if (message.isReq()) {
+            toReqParts(message.data()).forEach { reqPart -> append(reqPart) }
         } else {
             if (message.data()[0].toInt() == 0x00) {
-                for (respPart in toRespParts(message.data())) {
-                    append(respPart)
+                val prevReqParts = message.previous?.takeIf { it.cmd() == message.cmd() }?.let { toReqParts(it.data()) }
+                val respParts = toRespParts(message.data().drop(1))
+
+                if (prevReqParts != null) {
+                    prevReqParts.zip(respParts) { req, resp ->
+                        append(req)
+                        append(resp.dataToString())
+                    }
+                } else {
+                    respParts.forEach { resp -> append(resp) }
                 }
             }
             if (message.data()[0].toInt() == 0x01) {
@@ -135,122 +138,83 @@ class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIds
         }
     }
 
+    private fun toReqParts(data: List<UByte>): List<ReqPart> {
+        val result = ArrayList<ReqPart>()
+        var index = 0
+        do {
+            val type = TypeFlags(data[index])
+            val partSize = if (type.array) 3 else 2
+            val part = data.slice(index until index + partSize)
+            index += partSize
+
+            result.add(ReqPart(type, part[1], if(type.array) part[2].toInt() else null))
+        } while (type.more)
+
+        if(index != data.size) throw java.lang.IllegalStateException("Invalid get data request")
+
+        return result;
+    }
+
+    inner class ReqPart(val type: TypeFlags, val id: UByte, val offset: Int?) {
+        override fun toString() = buildString {
+            append(" ${hex(type.typeValue)}:${hex(id)}")
+            append("(${dataIdsByInt[id] ?: "Unknown"})")
+            if (type.array) append("[${offset}]")
+        }
+    }
 
     private fun toRespParts(data: List<UByte>): List<RespPart> {
-        val respData = data.drop(1)
         val result = ArrayList<RespPart>()
         var index = 0
         do {
-            val array = isBitSet(respData[index], 6)
-            val more = isBitSet(respData[index], 7)
+            val type = TypeFlags(data[index])
+            val elementCount = if (type.array) data[index + 2].toInt() else 1
+            val headerSize = if (type.array) 3 else 2
+            val partSize = headerSize + (type.elementSize * elementCount)
 
-            // String might be String + array?
-            val string = isBitSet(respData[index], 5) && isBitSet(respData[index], 4)
-
-            val sizeNibble = respData[index] and 0x0fu
-
-
-            // For 0 each element is 1 byte, for other values each element is X nibbles
-            val elementSize = if (sizeNibble.toInt() == 0) 1 else sizeNibble.toInt() / 2
-
-            val elementCount = if (array) respData[index + 2].toInt() else 1
-            val headerSize = if (array) 3 else 2
-            val partSize = headerSize + (elementSize * elementCount)
-
-            val part = respData.slice(index until index + partSize)
+            val part = data.slice(index until index + partSize)
             index += partSize
 
             val elementsData = part.drop(headerSize)
             val elements = ArrayList<List<UByte>>()
-            if (array) {
-                if (sizeNibble.toInt() == 0) {
+            if (type.array) {
+                if (type.size == 0) {
                     // Array of bytes
                     elements.add(elementsData)
                 } else {
                     // Array of sized elements
                     for (elementIndex in 0 until elementCount) {
-                        elements.add(elementsData.slice(elementIndex * elementSize until (elementIndex + 1) * elementSize))
+                        elements.add(elementsData.slice(elementIndex * type.elementSize until (elementIndex + 1) * type.elementSize))
                     }
                 }
             } else {
                 elements.add(elementsData)
             }
 
-            result.add(RespPart(part[0] and 0x7fu, part[1], array, string, elements, part))
-        } while (more)
+            result.add(RespPart(type, part[1], elements))
+        } while (type.more)
 
-        if (index != respData.size) {
-        }
-
+        if(index != data.size) throw java.lang.IllegalStateException("Invalid get data response")
 
         return result;
     }
 
-    inner class RespPart(val flags: UByte, val type: UByte, val array: Boolean, val string: Boolean, val elements: List<List<UByte>>, val data: List<UByte>) {
+    inner class RespPart(val type: TypeFlags, val id: UByte, val elements: List<List<UByte>>) {
         override fun toString() = buildString {
+            append(" ${hex(type.typeValue)}:${hex(id)}")
+            append("(${dataIdsByInt[id] ?: "Unknown"})")
+            append(dataToString())
+        }
 
-            val sizeNibble = flags and 0x0fu  // TODO: !! Found a '5' size nibble, maybe left 3 bits are size !!! And rightmost is.. ?????
-            val unsigned = !isBitSet(flags, 5) && !isBitSet(flags, 4)
-            val signed = !isBitSet(flags, 5) && isBitSet(flags, 4)
-            val float = isBitSet(flags, 5) && !isBitSet(flags, 4)
-            val string = isBitSet(flags, 5) && isBitSet(flags, 4)
-
-            val formatter: (value: List<UByte>) -> String = when {
-                unsigned && sizeNibble.toInt() > 0 -> ::uint
-                signed && sizeNibble.toInt() > 0 -> ::int
-                float && sizeNibble.toInt() == 8 -> ::float32
-                else -> ::hex
-            }
-
-            append(" ${hex(flags)}:${hex(type)}")
-            append("(${dataIdsByInt[type] ?: "Unknown"})")
+        fun dataToString() = buildString {
+            append(": ")
             append(
-                if (array) {
-                    if (string) {
-                        " '" + String(elements.first().toUByteArray().asByteArray()) + "'"
-                    } else {
-                        elements.joinToString(prefix = " [", postfix = "]", transform = formatter)
-                    }
+                if (type.array && type.size != 0) {
+                    elements.joinToString(prefix = "[", postfix = "]", transform = type.formatter)
                 } else {
-                    " ${formatter(elements.first())}"
+                    type.formatter(elements.first())
                 }
             )
-        }
-    }
-
-
-    fun uint(value: List<UByte>): String {
-        return BigInteger(1, value.toUByteArray().toByteArray()).toInt().toString()
-    }
-
-    fun int(value: List<UByte>): String {
-        return BigInteger(value.toUByteArray().toByteArray()).toInt().toString()
-    }
-
-    fun float32(value: List<UByte>): String {
-        return Float.fromBits(BigInteger(value.toUByteArray().toByteArray()).toInt()).toString()
-    }
-
-    private fun toReqParts(data: List<UByte>): List<ReqPart> {
-        val result = ArrayList<ReqPart>()
-        var index = 0
-        do {
-            val array = isBitSet(data[index], 6)
-            val more = isBitSet(data[index], 7)
-            val partSize = if (array) 3 else 2
-            val part = data.slice(index until index + partSize)
-            index += partSize
-
-            result.add(ReqPart(part[0] and 0x7fu, part[1], array, part))
-        } while (more)
-        return result;
-    }
-
-    inner class ReqPart(val flags: UByte, val type: UByte, val array: Boolean, val data: List<UByte>) {
-        override fun toString() = buildString {
-            append(" ${hex(flags)}:${hex(type)}")
-            if (array) append("[${data[2]}]")
-            append("(${dataIdsByInt[type] ?: "Unknown"})")
         }
     }
 
