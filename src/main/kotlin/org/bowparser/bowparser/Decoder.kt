@@ -36,19 +36,10 @@ class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIds
         }
 
         when (message.cmd()) {
-            0x08 -> if (message.isReqOrRsp()) decoded += createGetDataString(message)
+            0x08 -> if (message.isReqOrRsp()) decoded = "$cmdName ${if (message.isRsp()) " - OK" else ""} ${createGetDataString(message)}"
+            0x09 -> if (message.isReqOrRsp()) decoded = "$cmdName ${if (message.isRsp()) " - OK" else ""} ${createPutDataString(message)}"
             0x17 -> if (message.isReq()) decoded = "$cmdName: E-00${hex(data.slice(0 until 1))}"
             0x20 -> if (message.isRsp()) decoded = "$cmdName - OK ${hex(data.slice(0 until 2))} ${hex(data.slice(6 until 8))} (${hex(data)})"
-
-            0x34 -> if (message.isReq()) {
-                decoded += when (val value = data[0].toInt()) {
-                    0x00 -> ""
-                    0x01 -> " > ECO"
-                    0x02 -> " > NORMAL"
-                    0x03 -> " > POWER"
-                    else -> " > ???($value)"
-                }
-            }
 
             0x26, 0x27 -> if (message.isReq()) {
                 decoded += createCu2UpdateDisplayString(message)
@@ -93,6 +84,16 @@ class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIds
                 decoded += "trip1:${data[5].toInt().shl(24) + data[6].toInt().shl(16) + data[7].toInt().shl(8) + data[8].toInt()} "
                 decoded += "trip2:${data[9].toInt().shl(24) + data[10].toInt().shl(16) + data[11].toInt().shl(8) + data[12].toInt()} "
             }
+
+            0x34 -> if (message.isReq()) {
+                decoded += when (val value = data[0].toInt()) {
+                    0x00 -> ""
+                    0x01 -> " > ECO"
+                    0x02 -> " > NORMAL"
+                    0x03 -> " > POWER"
+                    else -> " > ???($value)"
+                }
+            }
         }
         return decoded
     }
@@ -111,6 +112,80 @@ class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIds
                 }
             )
             append(" ")
+        }
+    }
+
+    private fun createPutDataString(message: Message) = buildString {
+        if (message.isReq()) {
+            val data = message.data()
+
+            val result = ArrayList<PutDataPart>()
+            var index = 0
+            do {
+                val type = TypeFlags(data[index])
+
+                val headerSize = if (type.array) 5 else 2
+
+                val elementCount: Int
+                val offset : Int?
+                if (type.array) {
+                    val from = data[index + 2].toInt()
+                    val to = data[index + 3].toInt()
+                    val length = data[index + 4].toInt()
+                    elementCount = length
+                    offset = from
+                } else {
+                    elementCount = 1
+                    offset = null
+                }
+
+                val partSize = headerSize + (type.elementSize * elementCount)
+
+                val part = data.slice(index until index + partSize)
+                index += partSize
+
+                val elementsData = part.drop(headerSize)
+                val elements = ArrayList<List<UByte>>()
+                if (type.array) {
+                    if (type.size == 0) {
+                        // Array of bytes
+                        elements.add(elementsData)
+                    } else {
+                        // Array of sized elements
+                        for (elementIndex in 0 until elementCount) {
+                            elements.add(elementsData.slice(elementIndex * type.elementSize until (elementIndex + 1) * type.elementSize))
+                        }
+                    }
+                } else {
+                    elements.add(elementsData)
+                }
+
+                result.add(PutDataPart(type, part[1], offset, elements))
+            } while (type.more)
+
+            if (index != data.size) throw java.lang.IllegalStateException("Invalid put data request")
+
+            result.forEach { reqPart -> append(reqPart) }
+        }
+    }
+
+    inner class PutDataPart(val type: TypeFlags, val id: UByte, val offset: Int?, val elements: List<List<UByte>>) {
+        override fun toString() = buildString {
+            append(" ${hex(type.typeValue)}:${hex(id)}")
+            append("(${dataIdsByInt[id] ?: "Unknown"})")
+            if (type.array) append("[${offset}]")
+            append(dataToString())
+        }
+
+        fun dataToString() = buildString {
+            append(": ")
+            append(
+                if (type.array && type.size != 0) {
+                    elements.joinToString(prefix = "[", postfix = "]", transform = type.formatter)
+                } else {
+                    type.formatter(elements.first())
+                }
+            )
         }
     }
 
@@ -147,10 +222,10 @@ class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIds
             val part = data.slice(index until index + partSize)
             index += partSize
 
-            result.add(ReqPart(type, part[1], if(type.array) part[2].toInt() else null))
+            result.add(ReqPart(type, part[1], if (type.array) part[2].toInt() else null))
         } while (type.more)
 
-        if(index != data.size) throw java.lang.IllegalStateException("Invalid get data request")
+        if (index != data.size) throw java.lang.IllegalStateException("Invalid get data request")
 
         return result;
     }
@@ -194,7 +269,7 @@ class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIds
             result.add(RespPart(type, part[1], elements))
         } while (type.more)
 
-        if(index != data.size) throw java.lang.IllegalStateException("Invalid get data response")
+        if (index != data.size) throw java.lang.IllegalStateException("Invalid get data response")
 
         return result;
     }

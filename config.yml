@@ -24,6 +24,9 @@ dataIds:
     0x8e: Time
     0x99: Trip time
     0x9a: Max speed
+    0xb1: Bat volts
+    0xc0: Motor speed
+    0xc1: Motor distance
     0xd1: Motor serial#
 
 commands:

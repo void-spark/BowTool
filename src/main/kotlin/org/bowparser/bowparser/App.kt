@@ -68,7 +68,7 @@ class App : Application() {
             col("target", 60.0) { msg -> withName(msg.target, deviceByInt) },
             col("source", 60.0) { msg -> withName(msg.source, deviceByInt) },
             col("size", 50.0) { msg -> "${msg.size}" },
-            col("decoded", 800.0) { msg -> decoder.decode(msg) }
+            col("decoded", 1000.0) { msg -> if (decoder.check(msg).isEmpty()) decoder.decode(msg) else decoder.check(msg) }
         )
 
 
@@ -78,23 +78,44 @@ class App : Application() {
         buttonBox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
         buttonBox.children.addAll(openBinaryButton, openHexButton)
 
-        val hbox = HBox()
-        hbox.padding = Insets(15.0, 12.0, 15.0, 12.0)
-        hbox.spacing = 10.0
-        hbox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
+
 
         val handoff = CheckBox("HANDOFF")
         val ping = CheckBox("PING")
         val buttonCheck = CheckBox("Button Check")
 
+        val displayUpdate = CheckBox("Display update")
+        val invalid = CheckBox("Invalid")
+
         val motorCheck = CheckBox("Motor")
         val displayCheck = CheckBox("Display")
         val batteryCheck = CheckBox("Battery")
 
-        hbox.children.addAll(handoff, ping, buttonCheck, motorCheck, displayCheck, batteryCheck)
+        val getData = CheckBox("GET DATA")
+        val putData = CheckBox("PUT DATA")
+
+        val hbox = HBox()
+        hbox.padding = Insets(15.0, 12.0, 15.0, 12.0)
+        hbox.spacing = 10.0
+        hbox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
+
+        val hbox2 = HBox()
+        hbox2.padding = Insets(15.0, 12.0, 15.0, 12.0)
+        hbox2.spacing = 10.0
+        hbox2.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
+
+
+        val label2 = Label("Show")
+        label2.font =  Font(label2.font.size * 1.5)
+
+        hbox.children.addAll(label2, handoff, ping, buttonCheck, displayUpdate, invalid, motorCheck, displayCheck, batteryCheck)
+
+        val label3 = Label("Show only")
+        label3.font =  Font(label3.font.size * 1.5)
+        hbox2.children.addAll(label3, getData, putData)
 
         val vbox = VBox()
-        vbox.children.addAll(label, buttonBox, hbox)
+        vbox.children.addAll(label, buttonBox, hbox, hbox2)
 
 
         val pane = BorderPane()
@@ -111,6 +132,8 @@ class App : Application() {
         motorCheck.isSelected = true
         displayCheck.isSelected = true
         batteryCheck.isSelected = true
+        displayUpdate.isSelected = true
+        invalid.isSelected = true
 
         val filterPredicate = Bindings.createObjectBinding({
             Predicate<Message> { message ->
@@ -120,14 +143,21 @@ class App : Application() {
             }.and { message ->
                 buttonCheck.isSelected || !message.isCmd(0x22)
             }.and { message ->
+                displayUpdate.isSelected || !(message.isCmd(0x26) || message.isCmd(0x27) || message.isCmd(0x28))
+            }.and { message ->
+                invalid.isSelected || decoder.check(message).isEmpty()
+            }.and { message ->
                 motorCheck.isSelected || !(message.tgt() == 0x00 || message.src() == 0x00)
             }.and { message ->
                 displayCheck.isSelected || !(message.tgt() == 0x0c || message.src() == 0x0c)
             }.and { message ->
                 batteryCheck.isSelected || !(message.tgt() == 0x02 || message.src() == 0x02)
+            }.and { message ->
+                !getData.isSelected || message.isCmd(0x08)
+            }.and { message ->
+                !putData.isSelected || message.isCmd(0x09)
             }
-
-        }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty(), motorCheck.selectedProperty(), displayCheck.selectedProperty(), batteryCheck.selectedProperty())
+        }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty(), displayUpdate.selectedProperty(), invalid.selectedProperty(),  motorCheck.selectedProperty(), displayCheck.selectedProperty(), batteryCheck.selectedProperty(), getData.selectedProperty(), putData.selectedProperty())
 
         openBinaryButton.setOnAction { event ->
             val file = fileChooser.showOpenDialog(stage)
