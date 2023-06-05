@@ -1,8 +1,5 @@
 package org.bowparser.bowparser
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.module.kotlin.KotlinModule
 import javafx.application.Application
 import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleStringProperty
@@ -16,9 +13,6 @@ import javafx.scene.paint.Color
 import javafx.scene.text.Font
 import javafx.stage.FileChooser
 import javafx.stage.Stage
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.util.*
 import java.util.function.Predicate
 
 
@@ -31,18 +25,8 @@ class App : Application() {
     override fun start(stage: Stage) {
         val table = TableView(FXCollections.emptyObservableList<Message>())
 
+        val config = loadConfig()
 
-        val mapper = ObjectMapper(YAMLFactory())
-        mapper.registerModule(KotlinModule.Builder().build())
-
-
-        val appConfigPath = Paths.get("app", "config.yml")
-        val localConfigPath = Paths.get("config.yml")
-        val configPath = if(Files.exists(appConfigPath)) appConfigPath else localConfigPath
-
-        val config = Files.newBufferedReader(configPath).use {
-            mapper.readValue(it, Config::class.java)
-        }
         println(config.toString())
 
         val typesByInt = byInt(config.types)
