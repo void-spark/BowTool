@@ -7,7 +7,7 @@ class TypeFlags(flags: UByte) {
     val more = isBitSet(flags, 7)
 
     /**
-     * Is the value a array (of bytes or elements)
+     * Is the value an array (of bytes or elements)
      */
     val array = isBitSet(flags, 6)
 

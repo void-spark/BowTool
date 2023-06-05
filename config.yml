@@ -15,6 +15,7 @@ dataIds:
     0x18: Battery level
     0x1a: Max battery level
     0x32: Battery serial#
+    0x35: CU3 date
     0x38: Calibration A
     0x3a: Calibration B
     0x3b: Distance to maintenance
@@ -25,6 +26,8 @@ dataIds:
     0x99: Trip time
     0x9a: Max speed
     0xb1: Bat volts
+    0xb8: CU3 serial#
+    0xbf: CU3 button unit version
     0xc0: Motor speed
     0xc1: Motor distance
     0xd1: Motor serial#

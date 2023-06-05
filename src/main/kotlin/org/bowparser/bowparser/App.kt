@@ -1,5 +1,6 @@
 package org.bowparser.bowparser
 
+import com.fazecast.jSerialComm.SerialPort
 import javafx.application.Application
 import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleStringProperty
@@ -13,6 +14,7 @@ import javafx.scene.paint.Color
 import javafx.scene.text.Font
 import javafx.stage.FileChooser
 import javafx.stage.Stage
+import javafx.util.StringConverter
 import java.util.function.Predicate
 
 
@@ -42,6 +44,22 @@ class App : Application() {
 
         val openBinaryButton = Button("Open binary...")
         val openHexButton = Button("Open hex...")
+
+        val portCombBox = ComboBox(FXCollections.observableArrayList(SerialPort.getCommPorts().toList()))
+
+        portCombBox.setConverter(object : StringConverter<SerialPort>() {
+            override fun toString(port: SerialPort): String? {
+                return port.systemPortName
+            }
+
+            override fun fromString(string: String?): SerialPort? {
+                return null
+            }
+        })
+
+        portCombBox.selectionModel.select(0)
+
+        val scanCU3 = Button("Scan CU3")
 
         val label = Label("BOW decoder")
         label.font = Font("Arial", 20.0)
@@ -166,6 +184,8 @@ class App : Application() {
                 Thread(task).start()
             }
         }
+
+        scanCU3.setOnAction { event -> Scan.scan(portCombBox.value, dataIdsByInt) }
 
         stage.scene = Scene(pane)
         stage.show()
