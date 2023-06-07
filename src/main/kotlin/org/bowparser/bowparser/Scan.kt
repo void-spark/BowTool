@@ -31,7 +31,7 @@ object Scan {
             var idPos = 0
             var typePos = 0
             val allTypes = (0x00u..0xffu).map { it.toUByte() }
-            val types = listOf<UByte>(0x00u, 0x04u, 0x08u, 0x14u, 0x28u, 0x70u, 0x40u, 0x44u, 0x48u) + allTypes
+            val types = listOf<UByte>(0x00u, 0x04u, 0x08u, 0x14u, 0x28u, 0x70u, 0x40u, 0x44u, 0x48u, 0x54u) + allTypes
 
             val parser = MessageParser(fun(message) {
                 if (state == State.WAIT_RESPONSE) {
