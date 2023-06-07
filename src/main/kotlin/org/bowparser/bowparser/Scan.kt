@@ -3,7 +3,6 @@ package org.bowparser.bowparser
 import com.fazecast.jSerialComm.SerialPort
 
 @OptIn(ExperimentalUnsignedTypes::class)
-
 object Scan {
 
     enum class State {
@@ -21,11 +20,11 @@ object Scan {
         val decoder = GetDataDecoder(dataIdsByInt)
         serialPort.openPort()
         serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 225, 0)
-        val results = ArrayList<Pair<List<UByte>, Message>>()
+        val results = ArrayList<Pair<Message, Message>>()
         try {
             val toScan = List(256) { it.toUByte() }.toMutableList()
             val readBuffer = ByteArray(1024)
-            var request: List<UByte>? = null
+            var request: Message? = null
             var state = State.FLUSH
 
             var idPos = 0
@@ -35,7 +34,9 @@ object Scan {
 
             val parser = MessageParser(fun(message) {
                 if (state == State.WAIT_RESPONSE) {
-                    if (message.tgt() == 0x04 && message.isRsp() && message.src() == target.toInt() && message.isCmd(0x08)) {
+                    if (message.tgt() ==  target.toInt() && message.isReq() && message.src() == 0x04 && message.isCmd(0x08)) {
+                        request = message
+                    } else if (message.tgt() == 0x04 && message.isRsp() && message.src() == target.toInt() && message.isCmd(0x08)) {
                         state = State.SEND_COMMAND
 
                         val response = message.data()[0]
@@ -56,8 +57,9 @@ object Scan {
                         }
                         if (idPos == toScan.size) {
                             if (toScan.size == 0 || typePos == types.size - 1) {
+                                results.sortBy { msg -> msg.first.data()[1] }
                                 results.forEach {
-                                    println("Req: ${hex(it.first)}, Resp: ${hex(it.second.message)}, Decoded:${decoder.createGetDataString(it.second)}")
+                                    println("Req: ${hex(it.first.message)}, Resp: ${hex(it.second.message)}, Decoded:${decoder.createGetDataString(it.second)}")
                                 }
                                 state = State.DONE
                                 return
@@ -71,8 +73,9 @@ object Scan {
 
             while (state != State.DONE) {
                 if (state == State.SEND_COMMAND) {
+                    request = null;
                     val first = (target.toInt().shl(4) or 0x01).toUByte()
-                    request = if (TypeFlags(types[typePos]).array) {
+                    if (TypeFlags(types[typePos]).array) {
                         send(listOf(first, 0x43u, 0x08u, types[typePos], toScan[idPos], 0x00u), serialPort)
                     } else {
                         send(listOf(first, 0x42u, 0x08u, types[typePos], toScan[idPos]), serialPort)
@@ -107,14 +110,12 @@ object Scan {
         }
     }
 
-    @OptIn(ExperimentalUnsignedTypes::class)
-    private fun send(cmd: List<UByte>, comPort: SerialPort): List<UByte> {
+    private fun send(cmd: List<UByte>, comPort: SerialPort) {
         val outList = cmd.toMutableList()
         outList.add(0, 0x10u)
         outList.add(CRC8().crc8Bow(outList))
 
         val escaped = outList.flatMapIndexed { ind, it -> if (ind != 0 && it.toUInt() == 0x10u) listOf(it, it) else listOf(it) }
         comPort.writeBytes(escaped.toUByteArray().toByteArray(), escaped.size.toLong())
-        return outList
     }
 }
