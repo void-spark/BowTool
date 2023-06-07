@@ -59,6 +59,8 @@ class App : Application() {
 
         portCombBox.selectionModel.select(0)
 
+        val scanMotor = Button("Scan motor")
+        val scanBattery = Button("Scan battery")
         val scanCU3 = Button("Scan CU3")
 
         val label = Label("BOW decoder")
@@ -78,7 +80,7 @@ class App : Application() {
         //buttonBox.padding = Insets(15.0, 12.0, 15.0, 12.0)
         buttonBox.spacing = 10.0
         buttonBox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
-        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, scanCU3)
+        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, scanMotor, scanBattery, scanCU3)
 
 
         val handoff = CheckBox("HANDOFF")
@@ -184,7 +186,9 @@ class App : Application() {
             }
         }
 
-        scanCU3.setOnAction { event -> Scan.scan(portCombBox.value, dataIdsByInt) }
+        scanMotor.setOnAction { event -> Scan.scan(portCombBox.value, 0x00u, dataIdsByInt) }
+        scanBattery.setOnAction { event -> Scan.scan(portCombBox.value, 0x02u, dataIdsByInt) }
+        scanCU3.setOnAction { event -> Scan.scan(portCombBox.value, 0x0Cu, dataIdsByInt) }
 
         stage.scene = Scene(pane)
         stage.show()

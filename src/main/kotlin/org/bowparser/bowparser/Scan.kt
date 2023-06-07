@@ -14,10 +14,10 @@ object Scan {
     fun main(args: Array<String>) {
         val config = loadConfig()
         val comPort = SerialPort.getCommPorts()[0]
-        scan(comPort, byInt(config.dataIds))
+        scan(comPort, 0x0Cu, byInt(config.dataIds))
     }
 
-    fun scan(serialPort: SerialPort, dataIdsByInt: Map<UByte, String>) {
+    fun scan(serialPort: SerialPort, target: UByte, dataIdsByInt: Map<UByte, String>) {
         val decoder = GetDataDecoder(dataIdsByInt)
         serialPort.openPort()
         serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 225, 0)
@@ -35,7 +35,7 @@ object Scan {
 
             val parser = MessageParser(fun(message) {
                 if (state == State.WAIT_RESPONSE) {
-                    if (message.tgt() == 0x04 && message.isRsp() && message.src() == 0x0C && message.isCmd(0x08)) {
+                    if (message.tgt() == 0x04 && message.isRsp() && message.src() == target.toInt() && message.isCmd(0x08)) {
                         state = State.SEND_COMMAND
 
                         val response = message.data()[0]
@@ -71,10 +71,11 @@ object Scan {
 
             while (state != State.DONE) {
                 if (state == State.SEND_COMMAND) {
+                    val first = (target.toInt().shl(4) or 0x01).toUByte()
                     request = if (TypeFlags(types[typePos]).array) {
-                        send(listOf(0x10u, 0xC1u, 0x43u, 0x08u, types[typePos], toScan[idPos], 0x00u), serialPort)
+                        send(listOf(first, 0x43u, 0x08u, types[typePos], toScan[idPos], 0x00u), serialPort)
                     } else {
-                        send(listOf(0x10u, 0xC1u, 0x42u, 0x08u, types[typePos], toScan[idPos]), serialPort)
+                        send(listOf(first, 0x42u, 0x08u, types[typePos], toScan[idPos]), serialPort)
                     }
 
                     state = State.WAIT_RESPONSE
@@ -109,17 +110,10 @@ object Scan {
     @OptIn(ExperimentalUnsignedTypes::class)
     private fun send(cmd: List<UByte>, comPort: SerialPort): List<UByte> {
         val outList = cmd.toMutableList()
+        outList.add(0, 0x10u)
         outList.add(CRC8().crc8Bow(outList))
 
-        val escaped = mutableListOf(outList.first())
-        outList.drop(1).forEach {
-            if (it.toUInt() == 0x10u) {
-                escaped.add(it)
-                escaped.add(it)
-            } else {
-                escaped.add(it)
-            }
-        }
+        val escaped = outList.flatMapIndexed { ind, it -> if (ind != 0 && it.toUInt() == 0x10u) listOf(it, it) else listOf(it) }
         comPort.writeBytes(escaped.toUByteArray().toByteArray(), escaped.size.toLong())
         return outList
     }
