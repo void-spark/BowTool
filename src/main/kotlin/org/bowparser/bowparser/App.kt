@@ -186,9 +186,9 @@ class App : Application() {
             }
         }
 
-        scanMotor.setOnAction { event -> Scan.scan(portCombBox.value, 0x00u, dataIdsByInt) }
-        scanBattery.setOnAction { event -> Scan.scan(portCombBox.value, 0x02u, dataIdsByInt) }
-        scanCU3.setOnAction { event -> Scan.scan(portCombBox.value, 0x0Cu, dataIdsByInt) }
+        scanMotor.setOnAction { event -> Scanner(portCombBox.value, 0x00u, dataIdsByInt).scan() }
+        scanBattery.setOnAction { event -> Scanner(portCombBox.value, 0x02u, dataIdsByInt).scan() }
+        scanCU3.setOnAction { event -> Scanner(portCombBox.value, 0x0Cu, dataIdsByInt).scan() }
 
         stage.scene = Scene(pane)
         stage.show()
