@@ -48,8 +48,8 @@ class App : Application() {
         val portCombBox = ComboBox(FXCollections.observableArrayList(SerialPort.getCommPorts().toList()))
 
         portCombBox.setConverter(object : StringConverter<SerialPort>() {
-            override fun toString(port: SerialPort): String? {
-                return port.systemPortName
+            override fun toString(port: SerialPort?): String? {
+                return if (port == null) "-" else port.systemPortName
             }
 
             override fun fromString(string: String?): SerialPort? {
@@ -78,8 +78,7 @@ class App : Application() {
         //buttonBox.padding = Insets(15.0, 12.0, 15.0, 12.0)
         buttonBox.spacing = 10.0
         buttonBox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
-        buttonBox.children.addAll(openBinaryButton, openHexButton)
-
+        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, scanCU3)
 
 
         val handoff = CheckBox("HANDOFF")
@@ -108,12 +107,12 @@ class App : Application() {
 
 
         val label2 = Label("Show")
-        label2.font =  Font(label2.font.size * 1.5)
+        label2.font = Font(label2.font.size * 1.5)
 
         hbox.children.addAll(label2, handoff, ping, buttonCheck, displayUpdate, invalid, motorCheck, displayCheck, batteryCheck)
 
         val label3 = Label("Show only")
-        label3.font =  Font(label3.font.size * 1.5)
+        label3.font = Font(label3.font.size * 1.5)
         hbox2.children.addAll(label3, getData, putData)
 
         val vbox = VBox()

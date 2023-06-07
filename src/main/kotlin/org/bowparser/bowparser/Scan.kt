@@ -1,14 +1,13 @@
 package org.bowparser.bowparser
 
 import com.fazecast.jSerialComm.SerialPort
-import kotlin.system.exitProcess
 
 @OptIn(ExperimentalUnsignedTypes::class)
 
 object Scan {
 
     enum class State {
-        FLUSH, SEND_COMMAND, WAIT_RESPONSE
+        FLUSH, SEND_COMMAND, WAIT_RESPONSE, DONE
     }
 
     @JvmStatic
@@ -34,7 +33,7 @@ object Scan {
             val allTypes = (0x00u..0xffu).map { it.toUByte() }
             val types = listOf<UByte>(0x00u, 0x04u, 0x08u, 0x14u, 0x28u, 0x70u, 0x40u, 0x44u, 0x48u) + allTypes
 
-            val parser = MessageParser({ message ->
+            val parser = MessageParser(fun(message) {
                 if (state == State.WAIT_RESPONSE) {
                     if (message.tgt() == 0x04 && message.isRsp() && message.src() == 0x0C && message.isCmd(0x08)) {
                         state = State.SEND_COMMAND
@@ -60,7 +59,8 @@ object Scan {
                                 results.forEach {
                                     println("Req: ${hex(it.first)}, Resp: ${hex(it.second.message)}, Decoded:${decoder.createGetDataString(it.second)}")
                                 }
-                                exitProcess(0)
+                                state = State.DONE
+                                return
                             }
                             typePos++
                             idPos = 0
@@ -69,7 +69,7 @@ object Scan {
                 }
             }, { message -> println("Incomplete: ${hex(message)}, crc:${hex(CRC8().crc8Bow(message.dropLast(1)))}") })
 
-            while (true) {
+            while (state != State.DONE) {
                 if (state == State.SEND_COMMAND) {
                     request = if (TypeFlags(types[typePos]).array) {
                         send(listOf(0x10u, 0xC1u, 0x43u, 0x08u, types[typePos], toScan[idPos], 0x00u), serialPort)
@@ -99,7 +99,7 @@ object Scan {
                 }
 
                 val read = readBuffer.sliceArray(0 until numRead).toUByteArray()
-                read.forEach { parser.feed(it) }
+                read.forEach { if (state != State.DONE) parser.feed(it) }
             }
         } catch (ex: Exception) {
             ex.printStackTrace()
