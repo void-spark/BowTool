@@ -7,12 +7,12 @@ object Scan {
     fun main(args: Array<String>) {
         val config = loadConfig()
         val comPort = SerialPort.getCommPorts()[0]
-        Scanner(comPort, 0x0Cu, byInt(config.dataIds)).scan()
+        Scanner(comPort, 19200, 0x02u, byInt(config.dataIds)).scan()
     }
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
-class Scanner(private val serialPort: SerialPort, private val target: UByte, dataIdsByInt: Map<UByte, String>) {
+class Scanner(private val serialPort: SerialPort, private val baudRate: Int, private val target: UByte, dataIdsByInt: Map<UByte, String>) {
     enum class State {
         FLUSH, WAIT_FOR_BAT, SEND_COMMAND, WAIT_RESPONSE, DONE
     }
@@ -33,6 +33,7 @@ class Scanner(private val serialPort: SerialPort, private val target: UByte, dat
     private var waited = 0
 
     fun scan() {
+        serialPort.setBaudRate(baudRate)
         serialPort.openPort()
         serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 225, 0)
 
