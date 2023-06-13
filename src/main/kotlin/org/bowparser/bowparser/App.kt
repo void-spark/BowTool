@@ -142,31 +142,44 @@ class App : Application() {
         displayUpdate.isSelected = true
         invalid.isSelected = true
 
-        val filterPredicate = Bindings.createObjectBinding({
-            Predicate<Message> { message ->
-                handoff.isSelected || !message.isHandoff()
-            }.and { message ->
-                ping.isSelected || !message.isPingOrPong()
-            }.and { message ->
-                buttonCheck.isSelected || !message.isCmd(0x22)
-            }.and { message ->
-                displayUpdate.isSelected || !(message.isCmd(0x26) || message.isCmd(0x27) || message.isCmd(0x28))
-            }.and { message ->
-                invalid.isSelected || decoder.check(message).isEmpty()
-            }.and { message ->
-                motorCheck.isSelected || !(message.tgt() == 0x00 || message.src() == 0x00)
-            }.and { message ->
-                displayCheck.isSelected || !(message.tgt() == 0x0c || message.src() == 0x0c)
-            }.and { message ->
-                batteryCheck.isSelected || !(message.tgt() == 0x02 || message.src() == 0x02)
-            }.and { message ->
-                pcCheck.isSelected || !(message.tgt() == 0x04 || message.src() == 0x04)
-            }.and { message ->
-                !getData.isSelected || message.isCmd(0x08)
-            }.and { message ->
-                !putData.isSelected || message.isCmd(0x09)
-            }
-        }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty(), displayUpdate.selectedProperty(), invalid.selectedProperty(), motorCheck.selectedProperty(), displayCheck.selectedProperty(), batteryCheck.selectedProperty(), pcCheck.selectedProperty(), getData.selectedProperty(), putData.selectedProperty())
+        val filterPredicate = Bindings.createObjectBinding(
+            {
+                Predicate<Message> { message ->
+                    handoff.isSelected || !message.isHandoff()
+                }.and { message ->
+                    ping.isSelected || !message.isPingOrPong()
+                }.and { message ->
+                    buttonCheck.isSelected || !message.isCmd(0x22)
+                }.and { message ->
+                    displayUpdate.isSelected || !(message.isCmd(0x26) || message.isCmd(0x27) || message.isCmd(0x28))
+                }.and { message ->
+                    invalid.isSelected || decoder.check(message).isEmpty()
+                }.and { message ->
+                    motorCheck.isSelected || !(message.tgt() == 0x00 || message.src() == 0x00)
+                }.and { message ->
+                    displayCheck.isSelected || !(message.tgt() == 0x0c || message.src() == 0x0c)
+                }.and { message ->
+                    batteryCheck.isSelected || !(message.tgt() == 0x02 || message.src() == 0x02)
+                }.and { message ->
+                    pcCheck.isSelected || !(message.tgt() == 0x04 || message.src() == 0x04)
+                }.and { message ->
+                    !getData.isSelected || message.isCmd(0x08)
+                }.and { message ->
+                    !putData.isSelected || message.isCmd(0x09)
+                }
+            },
+            handoff.selectedProperty(),
+            ping.selectedProperty(),
+            buttonCheck.selectedProperty(),
+            displayUpdate.selectedProperty(),
+            invalid.selectedProperty(),
+            motorCheck.selectedProperty(),
+            displayCheck.selectedProperty(),
+            batteryCheck.selectedProperty(),
+            pcCheck.selectedProperty(),
+            getData.selectedProperty(),
+            putData.selectedProperty()
+        )
 
         openBinaryButton.setOnAction { event ->
             val file = fileChooser.showOpenDialog(stage)
