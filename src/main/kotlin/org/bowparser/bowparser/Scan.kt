@@ -14,7 +14,7 @@ object Scan {
 @OptIn(ExperimentalUnsignedTypes::class)
 class Scanner(private val serialPort: SerialPort, private val target: UByte, dataIdsByInt: Map<UByte, String>) {
     enum class State {
-        FLUSH, SEND_COMMAND, WAIT_RESPONSE, DONE
+        FLUSH, WAIT_FOR_BAT, SEND_COMMAND, WAIT_RESPONSE, DONE
     }
 
     private val toScan = List(256) { it.toUByte() }.toMutableList()
@@ -30,6 +30,8 @@ class Scanner(private val serialPort: SerialPort, private val target: UByte, dat
     private val decoder = GetDataDecoder(dataIdsByInt)
     private val parser = MessageParser(this::handleMessage) { message -> println("Incomplete: ${hex(message)}, crc:${hex(CRC8().crc8Bow(message.dropLast(1)))}") }
 
+    private var waited = 0
+
     fun scan() {
         serialPort.openPort()
         serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 225, 0)
@@ -37,15 +39,8 @@ class Scanner(private val serialPort: SerialPort, private val target: UByte, dat
         while (state != State.DONE) {
             if (state == State.SEND_COMMAND) {
                 request = null
-                val first = (target.toInt().shl(4) or 0x01).toUByte()
-                if (TypeFlags(types[typePos]).array) {
-                    send(listOf(first, 0x43u, 0x08u, types[typePos], toScan[idPos], 0x00u), serialPort)
-                } else {
-                    send(listOf(first, 0x42u, 0x08u, types[typePos], toScan[idPos]), serialPort)
-                }
-
+                sendGetData(serialPort, target, types[typePos], toScan[idPos])
                 state = State.WAIT_RESPONSE
-
                 continue
             }
 
@@ -53,7 +48,10 @@ class Scanner(private val serialPort: SerialPort, private val target: UByte, dat
 
             if (state == State.FLUSH) {
                 if (numRead == 0) {
-                    state = State.SEND_COMMAND
+                    state = when {
+                        target.toUInt() == 0x02u -> State.WAIT_FOR_BAT
+                        else -> State.SEND_COMMAND
+                    }
                 }
                 continue
             }
@@ -62,15 +60,34 @@ class Scanner(private val serialPort: SerialPort, private val target: UByte, dat
                 if (state == State.WAIT_RESPONSE) {
                     state = State.SEND_COMMAND
                 }
+                if (state == State.WAIT_FOR_BAT) {
+                    waited++
+                    if (waited == 10) {
+                        val toSend = listOf(0x00u.toByte()).toByteArray()
+                        serialPort.writeBytes(toSend, toSend.size.toLong())
+                        waited = 0
+                    }
+                }
                 continue
             }
-
-            val read = readBuffer.sliceArray(0 until numRead).toUByteArray()
-            read.forEach { if (state != State.DONE) parser.feed(it) }
+            readBuffer.sliceArray(0 until numRead).forEach { if (state != State.DONE) parser.feed(it.toUByte()) }
         }
     }
 
     private fun handleMessage(message: Message) {
+        if (state == State.WAIT_FOR_BAT) {
+            if (message.tgt() == 0x04) {
+                if (message.isPingOrPong()) {
+                    sendPong(serialPort, message.src()!!.toUByte())
+                }
+                if (message.isHandoff()) {
+                    sendWakeup(serialPort, target)
+                }
+                if (message.isRsp() && message.src() == 0x02 && message.cmd() == 0x14) {
+                    state = State.SEND_COMMAND
+                }
+            }
+        }
         if (state == State.WAIT_RESPONSE) {
             if (message.tgt() == target.toInt() && message.isReq() && message.src() == 0x04 && message.isCmd(0x08)) {
                 request = message
@@ -108,4 +125,23 @@ class Scanner(private val serialPort: SerialPort, private val target: UByte, dat
             }
         }
     }
+}
+
+private fun sendGetData(serialPort: SerialPort, target: UByte, type: UByte, id: UByte, offset: UByte = 0x00u) {
+    val first = (target.toInt().shl(4) or 0x01).toUByte()
+    if (TypeFlags(type).array) {
+        send(listOf(first, 0x43u, 0x08u, type, id, offset), serialPort)
+    } else {
+        send(listOf(first, 0x42u, 0x08u, type, id), serialPort)
+    }
+}
+
+private fun sendPong(serialPort: SerialPort, target: UByte) {
+    val first = (target.toInt().shl(4) or 0x03).toUByte()
+    send(listOf(first, 0x40u), serialPort)
+}
+
+private fun sendWakeup(serialPort: SerialPort, target: UByte) {
+    val first = (target.toInt().shl(4) or 0x01).toUByte()
+    send(listOf(first, 0x40u, 0x14u), serialPort)
 }
