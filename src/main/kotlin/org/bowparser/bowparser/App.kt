@@ -95,6 +95,7 @@ class App : Application() {
         val motorCheck = CheckBox("Motor")
         val displayCheck = CheckBox("Display")
         val batteryCheck = CheckBox("Battery")
+        val pcCheck = CheckBox("PC")
 
         val getData = CheckBox("GET DATA")
         val putData = CheckBox("PUT DATA")
@@ -113,7 +114,7 @@ class App : Application() {
         val label2 = Label("Show")
         label2.font = Font(label2.font.size * 1.5)
 
-        hbox.children.addAll(label2, handoff, ping, buttonCheck, displayUpdate, invalid, motorCheck, displayCheck, batteryCheck)
+        hbox.children.addAll(label2, handoff, ping, buttonCheck, displayUpdate, invalid, motorCheck, displayCheck, batteryCheck, pcCheck)
 
         val label3 = Label("Show only")
         label3.font = Font(label3.font.size * 1.5)
@@ -137,6 +138,7 @@ class App : Application() {
         motorCheck.isSelected = true
         displayCheck.isSelected = true
         batteryCheck.isSelected = true
+        pcCheck.isSelected = true
         displayUpdate.isSelected = true
         invalid.isSelected = true
 
@@ -158,11 +160,13 @@ class App : Application() {
             }.and { message ->
                 batteryCheck.isSelected || !(message.tgt() == 0x02 || message.src() == 0x02)
             }.and { message ->
+                pcCheck.isSelected || !(message.tgt() == 0x04 || message.src() == 0x04)
+            }.and { message ->
                 !getData.isSelected || message.isCmd(0x08)
             }.and { message ->
                 !putData.isSelected || message.isCmd(0x09)
             }
-        }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty(), displayUpdate.selectedProperty(), invalid.selectedProperty(),  motorCheck.selectedProperty(), displayCheck.selectedProperty(), batteryCheck.selectedProperty(), getData.selectedProperty(), putData.selectedProperty())
+        }, handoff.selectedProperty(), ping.selectedProperty(), buttonCheck.selectedProperty(), displayUpdate.selectedProperty(), invalid.selectedProperty(), motorCheck.selectedProperty(), displayCheck.selectedProperty(), batteryCheck.selectedProperty(), pcCheck.selectedProperty(), getData.selectedProperty(), putData.selectedProperty())
 
         openBinaryButton.setOnAction { event ->
             val file = fileChooser.showOpenDialog(stage)
