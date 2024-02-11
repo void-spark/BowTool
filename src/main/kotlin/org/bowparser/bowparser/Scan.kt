@@ -18,6 +18,7 @@ class Scanner(serialPort: SerialPort, baudRate: Int, private val target: UByte, 
     private val allTypes = (0x00u..0xffu).map { it.toUByte() }
     private val types = listOf<UByte>(0x00u, 0x04u, 0x08u, 0x14u, 0x28u, 0x70u, 0x40u, 0x44u, 0x48u, 0x54u) + allTypes
 
+    private var first = true
     private var idPos = 0
     private var typePos = 0
     private var request: Message? = null
@@ -28,17 +29,17 @@ class Scanner(serialPort: SerialPort, baudRate: Int, private val target: UByte, 
     fun scan() {
         if (!open()) return
 
-        println("Scanning, this might take some time. Check for TX/RX LED activity on your serial device")
-
         loop(if (target.toUInt() == 0x02u) Mode.WAKEUP_BAT else Mode.CHECK_BAT)
-
-        println("Scan finished")
     }
 
     /**
      * It's our turn, always send a GET DATA for the value we are trying to read.
      */
     override fun sendCommand() {
+        if(first) {
+            println("Scanning, this might take some time. Check for TX/RX LED activity on your serial device")
+            first = false;
+        }
         request = null
         if (TypeFlags(types[typePos]).array) {
             sendGetDataArray(target, types[typePos], toScan[idPos], arrOffset.toUByte())
@@ -94,6 +95,7 @@ class Scanner(serialPort: SerialPort, baudRate: Int, private val target: UByte, 
                     results.forEach {
                         println("Req: ${hex(it.first.message)}, Resp: ${hex(it.second.message)}, Decoded:${decoder.createGetDataString(it.second)}")
                     }
+                    println("Scan finished")
                     return Result.DONE
                 }
                 typePos++

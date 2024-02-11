@@ -87,7 +87,7 @@ abstract class StdLoop(serialPort: SerialPort, baudRate: Int) : SerialOp(serialP
                 if (state == State.WAIT_FOR_BAT) {
                     waited++
                     if (waited % 5 == 0) {
-                        if(waited == 20) {
+                        if(mode == Mode.CHECK_BAT && waited == 20) {
                             println("No response from battery, assuming not present.");
                             state = State.SEND_COMMAND
                             continue
