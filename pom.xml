@@ -11,32 +11,37 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <junit.version>5.9.1</junit.version>
-        <kotlin.version>1.7.20</kotlin.version>
+        <javafx-controls.version>21.0.2</javafx-controls.version>
+        <junit.version>5.10.2</junit.version>
+        <kotlin.version>1.9.22</kotlin.version>
         <client.version>1.0.0</client.version>
-        <exec.maven.plugin.version>1.6.0</exec.maven.plugin.version>
+        <jackson.version>2.16.1</jackson.version>
+        <jSerialComm.version>2.10.4</jSerialComm.version>
+        <exec.maven.plugin.version>3.1.1</exec.maven.plugin.version>
+        <maven.resource.plugin.version>3.3.1</maven.resource.plugin.version>
+        <maven.dependency.plugin.version>3.6.1</maven.dependency.plugin.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>19</version>
+            <version>${javafx-controls.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.14.2</version>
+            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-kotlin</artifactId>
-            <version>2.14.2</version>
+            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>2.14.2</version>
+            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -52,13 +57,13 @@
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-stdlib-jdk8</artifactId>
+            <artifactId>kotlin-stdlib</artifactId>
             <version>${kotlin.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fazecast</groupId>
             <artifactId>jSerialComm</artifactId>
-            <version>2.9.3</version>
+            <version>${jSerialComm.version}</version>
         </dependency>
     </dependencies>
 
@@ -71,8 +76,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                    <source>19</source>
-                    <target>19</target>
+                    <source>21</source>
+                    <target>21</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -121,7 +126,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-resources-plugin</artifactId>
-                <version>3.3.0</version>
+                <version>${maven.resource.plugin.version}</version>
                 <executions>
                     <execution>
                         <id>copy-config</id>
@@ -146,7 +151,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.5.0</version>
+                <version>${maven.dependency.plugin.version}</version>
                 <executions>
                     <execution>
                         <id>copy-dependencies</id>

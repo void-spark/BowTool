@@ -49,7 +49,7 @@ class Scanner(private val serialPort: SerialPort, private val baudRate: Int, pri
                 continue
             }
 
-            val numRead = serialPort.readBytes(readBuffer, readBuffer.size.toLong())
+            val numRead = serialPort.readBytes(readBuffer, readBuffer.size)
 
             if (state == State.FLUSH) {
                 if (numRead == 0) {
@@ -69,7 +69,7 @@ class Scanner(private val serialPort: SerialPort, private val baudRate: Int, pri
                     waited++
                     if (waited == 10) {
                         val toSend = listOf(0x00u.toByte()).toByteArray()
-                        serialPort.writeBytes(toSend, toSend.size.toLong())
+                        serialPort.writeBytes(toSend, toSend.size)
                         waited = 0
                     }
                 }

@@ -9,7 +9,7 @@ rem
 rem PROJECT_VERSION: version used in pom.xml, e.g. 1.0-SNAPSHOT
 rem APP_VERSION: the application version, e.g. 1.0.0, shown in "about" dialog
 
-set JAVA_VERSION=19
+set JAVA_VERSION=21
 set MAIN_JAR=bowparser-%PROJECT_VERSION%.jar
 
 rem Set desired installer type: "app-image" "msi" "exe".

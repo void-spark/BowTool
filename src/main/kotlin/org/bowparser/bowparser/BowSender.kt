@@ -8,5 +8,5 @@ fun send(cmd: List<UByte>, comPort: SerialPort) {
     outList.add(CRC8().crc8Bow(outList))
 
     val escaped = outList.flatMapIndexed { ind, it -> if (ind != 0 && it.toUInt() == 0x10u) listOf(it, it) else listOf(it) }
-    comPort.writeBytes(escaped.toUByteArray().toByteArray(), escaped.size.toLong())
+    comPort.writeBytes(escaped.toUByteArray().toByteArray(), escaped.size)
 }
