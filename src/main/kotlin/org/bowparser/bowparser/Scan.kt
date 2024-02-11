@@ -12,141 +12,95 @@ object Scan {
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
-class Scanner(private val serialPort: SerialPort, baudRate: Int, private val target: UByte, dataIdsByInt: Map<UByte, String>) : SerialOp(serialPort, baudRate) {
-    enum class State {
-        FLUSH, WAIT_FOR_BAT, SEND_COMMAND, WAIT_RESPONSE, DONE
-    }
+class Scanner(serialPort: SerialPort, baudRate: Int, private val target: UByte, dataIdsByInt: Map<UByte, String>) : StdLoop(serialPort, baudRate) {
 
     private val toScan = List(256) { it.toUByte() }.toMutableList()
     private val allTypes = (0x00u..0xffu).map { it.toUByte() }
     private val types = listOf<UByte>(0x00u, 0x04u, 0x08u, 0x14u, 0x28u, 0x70u, 0x40u, 0x44u, 0x48u, 0x54u) + allTypes
 
-    private var state = State.FLUSH
     private var idPos = 0
     private var typePos = 0
-    private val readBuffer = ByteArray(1024)
     private var request: Message? = null
     private val results = ArrayList<Pair<Message, Message>>()
     private val decoder = GetDataDecoder(dataIdsByInt)
-    private val parser = MessageParser(this::handleMessage) { message -> println("Incomplete: ${hex(message)}, crc:${hex(CRC8().crc8Bow(message.dropLast(1)))}") }
     private var arrOffset = 0u
-    private var waited = 0
 
     fun scan() {
         if (!open()) return
 
-        while (state != State.DONE) {
-            if (state == State.SEND_COMMAND) {
-                request = null
-                if (TypeFlags(types[typePos]).array) {
-                    sendGetDataArray(target, types[typePos], toScan[idPos], arrOffset.toUByte())
-                } else {
-                    sendGetData(target, types[typePos], toScan[idPos])
-                }
-                state = State.WAIT_RESPONSE
-                continue
-            }
+        println("Scanning, this might take some time. Check for TX/RX LED activity on your serial device")
 
-            val numRead = serialPort.readBytes(readBuffer, readBuffer.size)
-
-            if (state == State.FLUSH) {
-                if (numRead == 0) {
-                    state = when {
-                        target.toUInt() == 0x02u -> State.WAIT_FOR_BAT
-                        else -> State.SEND_COMMAND
-                    }
-                }
-                continue
-            }
-
-            if (numRead == 0) {
-                if (state == State.WAIT_RESPONSE) {
-                    state = State.SEND_COMMAND
-                }
-                if (state == State.WAIT_FOR_BAT) {
-                    waited++
-                    if (waited == 10) {
-                        sendWakeUpByte()
-                        waited = 0
-                    }
-                }
-                continue
-            }
-            readBuffer.sliceArray(0 until numRead).forEach { if (state != State.DONE) parser.feed(it.toUByte()) }
-        }
+        loop(if (target.toUInt() == 0x02u) Mode.WAKEUP_BAT else Mode.CHECK_BAT)
 
         println("Scan finished")
     }
 
-    private fun handleMessage(message: Message) {
-        if (state == State.WAIT_FOR_BAT) {
-            if (message.tgt() == pcId) {
-                if (message.isPingOrPong()) {
-                    sendPong(message.src()!!.toUByte())
-                }
-                if (message.isHandoff()) {
-                    sendWakeUp(target)
-                }
-                if (message.isRsp() && message.src() == 0x02 && message.cmd() == 0x14) {
-                    state = State.SEND_COMMAND
-                }
-            }
+    /**
+     * It's our turn, always send a GET DATA for the value we are trying to read.
+     */
+    override fun sendCommand() {
+        request = null
+        if (TypeFlags(types[typePos]).array) {
+            sendGetDataArray(target, types[typePos], toScan[idPos], arrOffset.toUByte())
+        } else {
+            sendGetData(target, types[typePos], toScan[idPos])
         }
-        if (state == State.WAIT_RESPONSE) {
-            if (message.tgt() == target.toInt() && message.isReq() && message.src() == pcId && message.isCmd(0x08)) {
-                request = message
-            } else if (message.tgt() == pcId && message.isRsp() && message.src() == target.toInt() && message.isCmd(0x08)) {
-                state = State.SEND_COMMAND
+    }
 
-                val response = message.data()[0]
-                if (response.toUInt() == 0x01u) {
-                    // No value, or invalid type requested
-                    if (typePos == 0) {
-                        // The first scan round uses a good type, during that round we check which values are missing.
-                        toScan.removeAt(idPos)
-                    } else {
-                        idPos++
-                    }
-                } else if (response.toUInt() == 0x02u) {
-                    // Requested type does not match stored type
-                    idPos++
+    override fun handleResponse(message: Message): Result {
+        if (message.tgt() == target.toInt() && message.isReq() && message.src() == pcId && message.isCmd(0x08)) {
+            // Keep a copy of the parsed request we sent.
+            request = message
+        } else if (message.tgt() == pcId && message.isRsp() && message.src() == target.toInt() && message.isCmd(0x08)) {
+            val response = message.data()[0]
+            if (response.toUInt() == 0x01u) {
+                // No value, or invalid type requested
+                if (typePos == 0) {
+                    // The first scan round uses a good type, during that round we check which values are missing.
+                    toScan.removeAt(idPos)
                 } else {
-                    var storeResult = true
-                    var toNext = true
+                    idPos++
+                }
+            } else if (response.toUInt() == 0x02u) {
+                // Requested type does not match stored type
+                idPos++
+            } else {
+                var storeResult = true
+                var toNext = true
 
-                    val type = request!!.data()[0]
-                    if (TypeFlags(type).array) {
-                        val respArrLength = message.data()[3]
-                        if (respArrLength.toUInt() != 0u) {
-                            // More to read,
-                            arrOffset += respArrLength
-                            toNext = false
-                        } else {
-                            // Nothing was left to read, don't store result
-                            arrOffset = 0u
-                            storeResult = false
-                        }
-                    }
-                    if (storeResult) {
-                        results.add(Pair(request!!, message))
-                    }
-                    if (toNext) {
-                        toScan.removeAt(idPos)
+                val type = request!!.data()[0]
+                if (TypeFlags(type).array) {
+                    val respArrLength = message.data()[3]
+                    if (respArrLength.toUInt() != 0u) {
+                        // More to read,
+                        arrOffset += respArrLength
+                        toNext = false
+                    } else {
+                        // Nothing was left to read, don't store result
+                        arrOffset = 0u
+                        storeResult = false
                     }
                 }
-                if (idPos == toScan.size) {
-                    if (toScan.size == 0 || typePos == types.size - 1) {
-                        results.sortBy { msg -> msg.first.data()[1] }
-                        results.forEach {
-                            println("Req: ${hex(it.first.message)}, Resp: ${hex(it.second.message)}, Decoded:${decoder.createGetDataString(it.second)}")
-                        }
-                        state = State.DONE
-                        return
-                    }
-                    typePos++
-                    idPos = 0
+                if (storeResult) {
+                    results.add(Pair(request!!, message))
+                }
+                if (toNext) {
+                    toScan.removeAt(idPos)
                 }
             }
+            if (idPos == toScan.size) {
+                if (toScan.size == 0 || typePos == types.size - 1) {
+                    results.sortBy { msg -> msg.first.data()[1] }
+                    results.forEach {
+                        println("Req: ${hex(it.first.message)}, Resp: ${hex(it.second.message)}, Decoded:${decoder.createGetDataString(it.second)}")
+                    }
+                    return Result.DONE
+                }
+                typePos++
+                idPos = 0
+            }
+            return Result.SEND_COMMAND
         }
+        return Result.CONTINUE
     }
 }

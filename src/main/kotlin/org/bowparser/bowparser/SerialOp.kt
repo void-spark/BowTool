@@ -5,6 +5,7 @@ import com.fazecast.jSerialComm.SerialPort
 @OptIn(ExperimentalUnsignedTypes::class)
 open class SerialOp(private val serialPort: SerialPort, private val baudRate: Int) {
 
+    protected val batId = 0x02
     protected val pcId = 0x04
 
     fun open(): Boolean {
@@ -17,6 +18,10 @@ open class SerialOp(private val serialPort: SerialPort, private val baudRate: In
         serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 225, 0)
         println("Port open")
         return true
+    }
+
+    fun read(buffer: ByteArray): Int {
+        return serialPort.readBytes(buffer, buffer.size)
     }
 
     fun sendGetData(target: UByte, type: UByte, id: UByte) {
@@ -35,7 +40,7 @@ open class SerialOp(private val serialPort: SerialPort, private val baudRate: In
      * Send a single '0' byte, which should wake up the battery.
      */
     fun sendWakeUpByte() {
-        sendRaw(listOf(0x00u.toUByte()))
+        sendRaw(0x00u)
     }
 
     /**
