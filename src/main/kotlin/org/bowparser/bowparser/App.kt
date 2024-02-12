@@ -64,6 +64,7 @@ class App : Application() {
         val scanMotor = Button("Scan motor")
         val scanBattery = Button("Scan battery")
         val scanCU3 = Button("Scan CU3")
+        val pairDisplay = Button("Pair display")
 
         val label = Label("BOW decoder")
         label.font = Font("Arial", 20.0)
@@ -82,7 +83,7 @@ class App : Application() {
         //buttonBox.padding = Insets(15.0, 12.0, 15.0, 12.0)
         buttonBox.spacing = 10.0
         buttonBox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
-        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, baudComboBox, scanMotor, scanBattery, scanCU3)
+        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, baudComboBox, scanMotor, scanBattery, scanCU3, pairDisplay)
 
 
         val handoff = CheckBox("HANDOFF")
@@ -208,6 +209,7 @@ class App : Application() {
         scanMotor.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x00u, dataIdsByInt).scan() }
         scanBattery.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x02u, dataIdsByInt).scan() }
         scanCU3.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x0Cu, dataIdsByInt).scan() }
+        pairDisplay.setOnAction { event -> DisplayPairer(portCombBox.value, baudComboBox.value, 1).scan() }
 
         stage.scene = Scene(pane)
         stage.show()

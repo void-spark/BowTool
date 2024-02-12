@@ -5,10 +5,12 @@ import com.fazecast.jSerialComm.SerialPort
 @OptIn(ExperimentalUnsignedTypes::class)
 open class SerialOp(private val serialPort: SerialPort, private val baudRate: Int) {
 
+    protected val motorId = 0x00
     protected val batId = 0x02
     protected val pcId = 0x04
+    protected val displayId = 0x0C
 
-    fun open(): Boolean {
+    protected fun open(): Boolean {
         serialPort.setBaudRate(baudRate)
         println("Trying to open serial port ${serialPort.systemPortName}(${serialPort.descriptivePortName}) at ${baudRate} baud")
         if (!serialPort.openPort()) {
@@ -20,40 +22,86 @@ open class SerialOp(private val serialPort: SerialPort, private val baudRate: In
         return true
     }
 
-    fun read(buffer: ByteArray): Int {
+    protected fun read(buffer: ByteArray): Int {
         return serialPort.readBytes(buffer, buffer.size)
     }
 
-    fun sendGetData(target: UByte, type: UByte, id: UByte) {
+    protected fun sendGetData(target: UByte, type: UByte, id: UByte) {
         sendCmd(target, 0x08u, type, id)
     }
 
-    fun sendGetDataArray(target: UByte, type: UByte, id: UByte, offset: UByte) {
+    protected fun sendGetDataArray(target: UByte, type: UByte, id: UByte, offset: UByte) {
         sendCmd(target, 0x08u, type, id, offset)
     }
 
-    fun sendWakeUp(target: UByte) {
+    protected fun sendPutData(target: UByte, type: UByte, id: UByte, vararg data: UByte) {
+        sendCmd(target, 0x09u, type, id, *data)
+    }
+
+    protected fun sendPutDataArray(target: UByte, type: UByte, id: UByte, from: UByte, to: UByte, length: UByte, vararg data: UByte) {
+        sendCmd(target, 0x09u, type, id, from, to, length, *data)
+    }
+
+    protected fun sendWakeUp(target: UByte) {
         sendCmd(target, 0x14u)
+    }
+
+    protected fun sendGetDisplaySerial(target: UByte) {
+        sendCmd(target, 0x20u)
+    }
+
+    protected fun sendGetDisplaySerialFromMotor(index: Int) {
+        var id: UByte = when (index) {
+            0 -> 0x5bu
+            1 -> 0x5cu
+            else -> throw IllegalArgumentException("Index ${index} out of range")
+        }
+        sendGetDataArray(motorId.toUByte(), 0x40u, id, 0x00u);
+    }
+
+    protected fun sendStoreDisplaySerialInMotor(index: Int, vararg serial: UByte) {
+        var id: UByte = when (index) {
+            0 -> 0x5bu
+            1 -> 0x5cu
+            else -> throw IllegalArgumentException("Index ${index} out of range")
+        }
+        sendPutDataArray(motorId.toUByte(), 0x40u, id, 0x00u, serial.size.toUByte(), serial.size.toUByte(), *serial)
+    }
+
+    protected fun sendGetMotorSerialFromMotor() {
+        sendGetDataArray(motorId.toUByte(), 0x70u, 0xd1u, 0x00u);
+    }
+
+    protected fun sendGetMotorSerialFromBattery() {
+        sendGetDataArray(batId.toUByte(), 0x70u, 0xc8u, 0x00u);
+    }
+
+    protected fun sendStoreMotorSerialInBattery(vararg serial: UByte) {
+        sendPutDataArray(batId.toUByte(), 0x70u, 0xc8u, 0x00u, serial.size.toUByte(), serial.size.toUByte(), *serial)
+    }
+
+    protected fun sendStoreDisableServiceCounter() {
+        sendPutData(batId.toUByte(), 0x08u, 0x3bu, 0x00u, 0x00u, 0x00u, 0x00u)
     }
 
     /**
      * Send a single '0' byte, which should wake up the battery.
      */
-    fun sendWakeUpByte() {
+    protected fun sendWakeUpByte() {
         sendRaw(0x00u)
     }
 
     /**
      * Sends a PONG message to the given target.
      */
-    fun sendPong(target: UByte) {
+    protected fun sendPong(target: UByte) {
         send(byte1(target, 0x03u), byte2(pcId.toUByte(), 0x00))
     }
 
     /**
      * Send the given command to the given target, with the given (optional) data.
      */
-    fun sendCmd(target: UByte, cmd: UByte, vararg data: UByte) {
+    protected fun sendCmd(target: UByte, cmd: UByte, vararg data: UByte) {
         send(byte1(target, 0x01u), byte2(pcId.toUByte(), data.size), cmd, *data)
     }
 

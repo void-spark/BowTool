@@ -8,7 +8,7 @@ import kotlin.concurrent.thread
 @OptIn(ExperimentalUnsignedTypes::class)
 abstract class StdLoop(serialPort: SerialPort, baudRate: Int) : SerialOp(serialPort, baudRate) {
 
-    enum class State {
+    private enum class State {
         // Clear everything currently in the buffer, to get rid of noise
         FLUSH,
 
