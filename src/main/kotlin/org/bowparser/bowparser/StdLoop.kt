@@ -1,6 +1,8 @@
 package org.bowparser.bowparser
 
 import com.fazecast.jSerialComm.SerialPort
+import java.util.concurrent.LinkedBlockingQueue
+import kotlin.concurrent.thread
 
 
 @OptIn(ExperimentalUnsignedTypes::class)
@@ -45,16 +47,32 @@ abstract class StdLoop(serialPort: SerialPort, baudRate: Int) : SerialOp(serialP
         DONE
     }
 
+    private val stdoutQueue = LinkedBlockingQueue<String>()
     private var state = State.FLUSH
     private val readBuffer = ByteArray(1024)
-    private val parser = MessageParser(this::handleMessage) { message -> println("Incomplete mesage: ${hex(message)}, crc:${hex(CRC8().crc8Bow(message.dropLast(1)))}") }
+    private val parser = MessageParser(this::handleMessage) { message -> log("Incomplete message: ${hex(message)}, crc:${hex(CRC8().crc8Bow(message.dropLast(1)))}") }
     private var waited = 0
 
     abstract fun sendCommand()
 
     abstract fun handleResponse(message: Message): Result
 
-    fun loop(mode: Mode) {
+    protected fun loop(mode: Mode) {
+        val logThread = thread(start = true) {
+            while (true) {
+                try {
+                    // If we got interrupted, still empty out the queue, but don't block.
+                    val logLine = if (Thread.currentThread().isInterrupted) stdoutQueue.poll() else stdoutQueue.take()
+                    if (logLine == null) {
+                        break;
+                    }
+                    println(logLine);
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                }
+            }
+        }
+
         state = when (mode) {
             Mode.DIRECT -> State.FLUSH
             else -> State.WAIT_FOR_BAT
@@ -92,12 +110,12 @@ abstract class StdLoop(serialPort: SerialPort, baudRate: Int) : SerialOp(serialP
                 if (state == State.WAIT_FOR_BAT) {
                     waited++
                     if (waited % 5 == 0) {
-                        if(mode == Mode.CHECK_BAT && waited == 20) {
-                            println("No response from battery, assuming not present.");
+                        if (mode == Mode.CHECK_BAT && waited == 20) {
+                            log("No response from battery, assuming not present.")
                             state = State.SEND_COMMAND
                             continue
                         }
-                        println("Bus silent, sending wake up byte.");
+                        log("Bus silent, sending wake up byte.")
                         sendWakeUpByte()
                     }
 
@@ -108,6 +126,13 @@ abstract class StdLoop(serialPort: SerialPort, baudRate: Int) : SerialOp(serialP
             // Feed the parser anything we read.
             readBuffer.sliceArray(0 until numRead).forEach { if (state != State.DONE) parser.feed(it.toUByte()) }
         }
+
+        logThread.interrupt()
+        logThread.join()
+    }
+
+    protected fun log(msg: String) {
+        stdoutQueue.put(msg)
     }
 
     private fun handleMessage(message: Message) {

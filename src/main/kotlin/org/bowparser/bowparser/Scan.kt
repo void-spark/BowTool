@@ -36,8 +36,8 @@ class Scanner(serialPort: SerialPort, baudRate: Int, private val target: UByte, 
      * It's our turn, always send a GET DATA for the value we are trying to read.
      */
     override fun sendCommand() {
-        if(first) {
-            println("Scanning, this might take some time. Check for TX/RX LED activity on your serial device")
+        if (first) {
+            log("Scanning, this might take some time. Check for TX/RX LED activity on your serial device")
             first = false;
         }
         request = null
@@ -93,9 +93,9 @@ class Scanner(serialPort: SerialPort, baudRate: Int, private val target: UByte, 
                 if (toScan.size == 0 || typePos == types.size - 1) {
                     results.sortBy { msg -> msg.first.data()[1] }
                     results.forEach {
-                        println("Req: ${hex(it.first.message)}, Resp: ${hex(it.second.message)}, Decoded:${decoder.createGetDataString(it.second)}")
+                        log("Req: ${hex(it.first.message)}, Resp: ${hex(it.second.message)}, Decoded:${decoder.createGetDataString(it.second)}")
                     }
-                    println("Scan finished")
+                    log("Scan finished")
                     return Result.DONE
                 }
                 typePos++
