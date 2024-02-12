@@ -55,6 +55,11 @@ abstract class StdLoop(serialPort: SerialPort, baudRate: Int) : SerialOp(serialP
     abstract fun handleResponse(message: Message): Result
 
     fun loop(mode: Mode) {
+        state = when (mode) {
+            Mode.DIRECT -> State.FLUSH
+            else -> State.WAIT_FOR_BAT
+        }
+
         while (state != State.DONE) {
             // It is time for use to send a command, actual command to send is up to the implementing class.
             if (state == State.SEND_COMMAND) {
