@@ -7,7 +7,7 @@ object Scan {
     fun main(args: Array<String>) {
         val config = loadConfig()
         val comPort = SerialPort.getCommPorts()[0]
-        Scanner(comPort, 19200, 0x02u, byInt(config.dataIds)).scan()
+        Scanner(comPort, 19200, 0x0cu, byInt(config.dataIds)).exec()
     }
 }
 
@@ -26,7 +26,7 @@ class Scanner(serialPort: SerialPort, baudRate: Int, private val target: UByte, 
     private val decoder = GetDataDecoder(dataIdsByInt)
     private var arrOffset = 0u
 
-    fun scan() {
+    fun exec() {
         if (!open()) return
 
         loop(if (target.toUInt() == 0x02u) Mode.WAKEUP_BAT else Mode.CHECK_BAT)

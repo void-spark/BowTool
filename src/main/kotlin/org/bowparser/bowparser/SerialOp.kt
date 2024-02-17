@@ -46,12 +46,12 @@ open class SerialOp(private val serialPort: SerialPort, private val baudRate: In
         sendCmd(target, 0x14u)
     }
 
-    protected fun sendGetDisplaySerial(target: UByte) {
-        sendCmd(target, 0x20u)
+    protected fun sendGetDisplaySerial() {
+        sendCmd(displayId.toUByte(), 0x20u)
     }
 
     protected fun sendGetDisplaySerialFromMotor(index: Int) {
-        var id: UByte = when (index) {
+        val id: UByte = when (index) {
             0 -> 0x5bu
             1 -> 0x5cu
             else -> throw IllegalArgumentException("Index ${index} out of range")
@@ -60,7 +60,7 @@ open class SerialOp(private val serialPort: SerialPort, private val baudRate: In
     }
 
     protected fun sendStoreDisplaySerialInMotor(index: Int, vararg serial: UByte) {
-        var id: UByte = when (index) {
+        val id: UByte = when (index) {
             0 -> 0x5bu
             1 -> 0x5cu
             else -> throw IllegalArgumentException("Index ${index} out of range")

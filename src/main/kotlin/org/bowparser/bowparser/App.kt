@@ -65,6 +65,7 @@ class App : Application() {
         val scanBattery = Button("Scan battery")
         val scanCU3 = Button("Scan CU3")
         val pairDisplay = Button("Pair display")
+        val pairBattery = Button("Pair battery")
 
         val label = Label("BOW decoder")
         label.font = Font("Arial", 20.0)
@@ -83,7 +84,7 @@ class App : Application() {
         //buttonBox.padding = Insets(15.0, 12.0, 15.0, 12.0)
         buttonBox.spacing = 10.0
         buttonBox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
-        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, baudComboBox, scanMotor, scanBattery, scanCU3, pairDisplay)
+        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, baudComboBox, scanMotor, scanBattery, scanCU3, pairDisplay, pairBattery)
 
 
         val handoff = CheckBox("HANDOFF")
@@ -206,10 +207,11 @@ class App : Application() {
             }
         }
 
-        scanMotor.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x00u, dataIdsByInt).scan() }
-        scanBattery.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x02u, dataIdsByInt).scan() }
-        scanCU3.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x0Cu, dataIdsByInt).scan() }
-        pairDisplay.setOnAction { event -> DisplayPairer(portCombBox.value, baudComboBox.value, 1).scan() }
+        scanMotor.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x00u, dataIdsByInt).exec() }
+        scanBattery.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x02u, dataIdsByInt).exec() }
+        scanCU3.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x0Cu, dataIdsByInt).exec() }
+        pairDisplay.setOnAction { event -> DisplayPairer(portCombBox.value, baudComboBox.value, 1).exec() }
+        pairBattery.setOnAction { event -> BatteryPairer(portCombBox.value, baudComboBox.value).exec() }
 
         stage.scene = Scene(pane)
         stage.show()
@@ -218,10 +220,7 @@ class App : Application() {
         // Serial reader ? (add items on the fly?)
         // Add items on the fly? (how to do background tasks anyways?) And bootup background tasks?
         // Req/Resp are a pair, if we find a set decode together
-        // Load file dialog of course
         // Caching of decoded messages? Most repeat. Key might be pair of messages
-
-
     }
 
     private fun col(header: String, width: Double, formatter: (Message) -> String): TableColumn<Message, String> {

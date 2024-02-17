@@ -2,7 +2,7 @@ package org.bowparser.bowparser
 
 import com.fazecast.jSerialComm.SerialPort
 
-object PairDisplay {
+object PairBattery {
     @JvmStatic
     fun main(args: Array<String>) {
         val comPort = SerialPort.getCommPorts()[0]
@@ -11,16 +11,16 @@ object PairDisplay {
 }
 
 @OptIn(ExperimentalUnsignedTypes::class)
-class DisplayPairer(serialPort: SerialPort, baudRate: Int, private var index: Int) : StdLoop(serialPort, baudRate) {
+class BatteryPairer(serialPort: SerialPort, baudRate: Int) : StdLoop(serialPort, baudRate) {
     private enum class State {
-        GET_DISPLAY_SERIAL,
+        GET_MOTOR_SERIAL,
         GET_STORED_SERIAL,
         PUT_SERIAL,
         CHECK_STORED_SERIAL
     }
 
-    private var state = State.GET_DISPLAY_SERIAL
-    private var displaySerial: List<UByte> = emptyList()
+    private var state = State.GET_MOTOR_SERIAL
+    private var motorSerial: List<UByte> = emptyList()
 
     fun exec() {
         if (!open()) return
@@ -30,10 +30,10 @@ class DisplayPairer(serialPort: SerialPort, baudRate: Int, private var index: In
 
     override fun sendCommand() {
         when (state) {
-            State.GET_DISPLAY_SERIAL -> sendGetDisplaySerial()
-            State.GET_STORED_SERIAL -> sendGetDisplaySerialFromMotor(index)
-            State.PUT_SERIAL -> sendStoreDisplaySerialInMotor(index, *displaySerial.toUByteArray())
-            State.CHECK_STORED_SERIAL -> sendGetDisplaySerialFromMotor(index)
+            State.GET_MOTOR_SERIAL -> sendGetMotorSerialFromMotor()
+            State.GET_STORED_SERIAL -> sendGetMotorSerialFromBattery()
+            State.PUT_SERIAL -> sendStoreMotorSerialInBattery(*motorSerial.toUByteArray())
+            State.CHECK_STORED_SERIAL -> sendGetMotorSerialFromBattery()
         }
     }
 
@@ -43,20 +43,20 @@ class DisplayPairer(serialPort: SerialPort, baudRate: Int, private var index: In
         }
 
         when (state) {
-            State.GET_DISPLAY_SERIAL -> {
-                if (message.src() == displayId && message.isCmd(0x20)) {
-                    displaySerial = message.data()
-                    log("Display serial: ${hex(displaySerial)}")
+            State.GET_MOTOR_SERIAL -> {
+                if (message.src() == motorId && message.isCmd(0x08)) {
+                    motorSerial = message.data().drop(4)
+                    log("Motor serial: ${hex(motorSerial)}")
                     state = State.GET_STORED_SERIAL
                     return Result.SEND_COMMAND
                 }
             }
 
             State.GET_STORED_SERIAL -> {
-                if (message.src() == motorId && message.isCmd(0x08)) {
-                    val motorDisplaySerial = message.data().drop(4)
-                    log("Display serial stored in motor slot ${index + 1}: ${hex(motorDisplaySerial)}")
-                    if (displaySerial.equals(motorDisplaySerial)) {
+                if (message.src() == batId && message.isCmd(0x08)) {
+                    val batteryMotorSerial = message.data().drop(4)
+                    log("Motor serial stored in battery: ${hex(batteryMotorSerial)}")
+                    if (motorSerial.equals(batteryMotorSerial)) {
                         log("Serials already match, no change made")
                         return Result.DONE
                     }
@@ -67,20 +67,19 @@ class DisplayPairer(serialPort: SerialPort, baudRate: Int, private var index: In
 
             State.PUT_SERIAL -> {
                 if (message.src() == motorId && message.isCmd(0x09)) {
-                    log("New display serial stored in motor!")
+                    log("New motor serial stored in battery!")
                     state = State.CHECK_STORED_SERIAL
                     return Result.SEND_COMMAND
                 }
             }
 
             State.CHECK_STORED_SERIAL -> {
-                if (message.src() == motorId && message.isCmd(0x08)) {
-                    log("Display serial stored in motor slot ${index + 1}: ${hex(message.data().drop(4))}")
+                if (message.src() == batId && message.isCmd(0x08)) {
+                    log("Motor serial stored in motor: ${hex(message.data().drop(4))}")
                     return Result.DONE
                 }
             }
         }
         return Result.CONTINUE
     }
-
 }
