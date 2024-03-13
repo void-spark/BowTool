@@ -4,8 +4,11 @@ import com.fazecast.jSerialComm.SerialPort
 import javafx.application.Application
 import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleStringProperty
+import javafx.beans.value.ObservableValue
 import javafx.collections.FXCollections
+import javafx.collections.ObservableList
 import javafx.collections.transformation.FilteredList
+import javafx.concurrent.Task
 import javafx.geometry.Insets
 import javafx.scene.Scene
 import javafx.scene.control.*
@@ -211,7 +214,20 @@ class App : Application() {
         scanBattery.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x02u, dataIdsByInt).exec() }
         scanCU3.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x0Cu, dataIdsByInt).exec() }
         pairDisplay.setOnAction { event -> DisplayPairer(portCombBox.value, baudComboBox.value, 1).exec() }
-        pairBattery.setOnAction { event -> BatteryPairer(portCombBox.value, baudComboBox.value).exec() }
+        pairBattery.setOnAction { event ->
+            val task = object : Task<List<Message>>() {
+                override fun call(): List<Message> {
+                    return BatteryPairer(portCombBox.value, baudComboBox.value).exec()
+                }
+            }
+            val valueProperty = task.valueProperty()
+            val resultList = Bindings.`when`(valueProperty.isNotNull())
+                .then(FXCollections.observableArrayList<Message>())
+                .otherwise(filtered(FXCollections.observableArrayList(valueProperty.value), filterPredicate))
+            table.itemsProperty().set(resultList)
+
+            Thread(task).start()
+        }
 
         stage.scene = Scene(pane)
         stage.show()
@@ -221,6 +237,11 @@ class App : Application() {
         // Add items on the fly? (how to do background tasks anyways?) And bootup background tasks?
         // Req/Resp are a pair, if we find a set decode together
         // Caching of decoded messages? Most repeat. Key might be pair of messages
+    }
+    private fun filtered(messages: ObservableList<Message>, filter: ObservableValue<Predicate<Message>>): FilteredList<Message> {
+        val result = FilteredList(messages)
+        result.predicateProperty().bind(filter)
+        return result;
     }
 
     private fun col(header: String, width: Double, formatter: (Message) -> String): TableColumn<Message, String> {

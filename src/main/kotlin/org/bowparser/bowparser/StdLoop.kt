@@ -48,6 +48,7 @@ abstract class StdLoop(serialPort: SerialPort, baudRate: Int) : SerialOp(serialP
     }
 
     private val stdoutQueue = LinkedBlockingQueue<String>()
+    private val messageLog = ArrayList<Message>(500);
     private var state = State.FLUSH
     private val readBuffer = ByteArray(1024)
     private val parser = MessageParser(this::handleMessage) { message -> log("Incomplete message: ${hex(message)}, crc:${hex(CRC8().crc8Bow(message.dropLast(1)))}") }
@@ -135,7 +136,12 @@ abstract class StdLoop(serialPort: SerialPort, baudRate: Int) : SerialOp(serialP
         stdoutQueue.put(msg)
     }
 
+    protected fun getMessageLog(): List<Message> {
+        return messageLog
+    }
+
     private fun handleMessage(message: Message) {
+        messageLog.add(message)
         if (state == State.WAIT_FOR_BAT) {
             if (message.tgt() == pcId) {
                 if (message.isPingOrPong()) {
