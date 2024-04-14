@@ -22,10 +22,11 @@ class BatteryPairer(serialPort: SerialPort, baudRate: Int) : StdLoop(serialPort,
     private var state = State.GET_MOTOR_SERIAL
     private var motorSerial: List<UByte> = emptyList()
 
-    fun exec() {
-        if (!open()) return
+    fun exec(): List<Message> {
+        if (!open()) return emptyList()
 
         loop(Mode.CHECK_BAT)
+        return getMessageLog()
     }
 
     override fun sendCommand() {

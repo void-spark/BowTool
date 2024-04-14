@@ -26,10 +26,11 @@ class Scanner(serialPort: SerialPort, baudRate: Int, private val target: UByte, 
     private val decoder = GetDataDecoder(dataIdsByInt)
     private var arrOffset = 0u
 
-    fun exec() {
-        if (!open()) return
+    fun exec(): List<Message>  {
+        if (!open()) return emptyList()
 
         loop(if (target.toUInt() == 0x02u) Mode.WAKEUP_BAT else Mode.CHECK_BAT)
+        return getMessageLog()
     }
 
     /**

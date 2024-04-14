@@ -4,8 +4,12 @@ import com.fazecast.jSerialComm.SerialPort
 import javafx.application.Application
 import javafx.beans.binding.Bindings
 import javafx.beans.property.SimpleStringProperty
-import javafx.collections.FXCollections
+import javafx.beans.value.ObservableValue
+import javafx.collections.FXCollections.emptyObservableList
+import javafx.collections.FXCollections.observableArrayList
+import javafx.collections.ObservableList
 import javafx.collections.transformation.FilteredList
+import javafx.concurrent.Task
 import javafx.geometry.Insets
 import javafx.scene.Scene
 import javafx.scene.control.*
@@ -25,7 +29,7 @@ class App : Application() {
 
 
     override fun start(stage: Stage) {
-        val table = TableView(FXCollections.emptyObservableList<Message>())
+        val table = TableView(emptyObservableList<Message>())
 
         val config = loadConfig()
 
@@ -45,8 +49,8 @@ class App : Application() {
         val openBinaryButton = Button("Open binary...")
         val openHexButton = Button("Open hex...")
 
-        val portCombBox = ComboBox(FXCollections.observableArrayList(SerialPort.getCommPorts().toList()))
-        val baudComboBox = ComboBox(FXCollections.observableArrayList(9600, 19200))
+        val portCombBox = ComboBox(observableArrayList(SerialPort.getCommPorts().toList()))
+        val baudComboBox = ComboBox(observableArrayList(9600, 19200))
 
         portCombBox.setConverter(object : StringConverter<SerialPort>() {
             override fun toString(port: SerialPort?): String? {
@@ -187,9 +191,7 @@ class App : Application() {
             val file = fileChooser.showOpenDialog(stage)
             if (file != null) {
                 val task = FileReaderTask(file.toPath(), true, deviceByInt, decoder)
-                val filter = FilteredList(task.getMessages())
-                filter.predicateProperty().bind(filterPredicate)
-                table.itemsProperty().set(filter)
+                table.itemsProperty().set(filtered(task.getMessages(), filterPredicate))
 
                 Thread(task).start()
             }
@@ -199,19 +201,27 @@ class App : Application() {
             val file = fileChooser.showOpenDialog(stage)
             if (file != null) {
                 val task = FileReaderTask(file.toPath(), false, deviceByInt, decoder)
-                val filter = FilteredList(task.getMessages())
-                filter.predicateProperty().bind(filterPredicate)
-                table.itemsProperty().set(filter)
+                table.itemsProperty().set(filtered(task.getMessages(), filterPredicate))
 
                 Thread(task).start()
             }
         }
 
-        scanMotor.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x00u, dataIdsByInt).exec() }
-        scanBattery.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x02u, dataIdsByInt).exec() }
-        scanCU3.setOnAction { event -> Scanner(portCombBox.value, baudComboBox.value, 0x0Cu, dataIdsByInt).exec() }
-        pairDisplay.setOnAction { event -> DisplayPairer(portCombBox.value, baudComboBox.value, 1).exec() }
-        pairBattery.setOnAction { event -> BatteryPairer(portCombBox.value, baudComboBox.value).exec() }
+        val doOp: (() -> List<Message>) -> Unit = { op ->
+            table.itemsProperty().set(observableArrayList())
+            val task = object : Task<Unit>() {
+                override fun call() {
+                    table.itemsProperty().set(filtered(observableArrayList(op()), filterPredicate))
+                }
+            }
+            Thread(task).start()
+        }
+
+        scanMotor.setOnAction { event -> doOp({ Scanner(portCombBox.value, baudComboBox.value, 0x00u, dataIdsByInt).exec() }) }
+        scanBattery.setOnAction { event -> doOp({ Scanner(portCombBox.value, baudComboBox.value, 0x02u, dataIdsByInt).exec() }) }
+        scanCU3.setOnAction { event -> doOp({ Scanner(portCombBox.value, baudComboBox.value, 0x0Cu, dataIdsByInt).exec() }) }
+        pairDisplay.setOnAction { event -> doOp({ DisplayPairer(portCombBox.value, baudComboBox.value, 1).exec() }) }
+        pairBattery.setOnAction { event -> doOp({ BatteryPairer(portCombBox.value, baudComboBox.value).exec() }) }
 
         stage.scene = Scene(pane)
         stage.show()
@@ -221,6 +231,11 @@ class App : Application() {
         // Add items on the fly? (how to do background tasks anyways?) And bootup background tasks?
         // Req/Resp are a pair, if we find a set decode together
         // Caching of decoded messages? Most repeat. Key might be pair of messages
+    }
+    private fun filtered(messages: ObservableList<Message>, filter: ObservableValue<Predicate<Message>>): FilteredList<Message> {
+        val result = FilteredList(messages)
+        result.predicateProperty().bind(filter)
+        return result;
     }
 
     private fun col(header: String, width: Double, formatter: (Message) -> String): TableColumn<Message, String> {

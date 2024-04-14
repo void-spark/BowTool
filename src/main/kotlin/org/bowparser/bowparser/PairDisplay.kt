@@ -22,10 +22,11 @@ class DisplayPairer(serialPort: SerialPort, baudRate: Int, private var index: In
     private var state = State.GET_DISPLAY_SERIAL
     private var displaySerial: List<UByte> = emptyList()
 
-    fun exec() {
-        if (!open()) return
+    fun exec(): List<Message> {
+        if (!open()) return emptyList()
 
         loop(Mode.CHECK_BAT)
+        return getMessageLog()
     }
 
     override fun sendCommand() {
