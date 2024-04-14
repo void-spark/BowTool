@@ -56,7 +56,7 @@ open class SerialOp(private val serialPort: SerialPort, private val baudRate: In
             1 -> 0x5cu
             else -> throw IllegalArgumentException("Index ${index} out of range")
         }
-        sendGetDataArray(motorId.toUByte(), 0x40u, id, 0x00u);
+        sendGetDataArray(motorId.toUByte(), 0x40u, id, 0x00u)
     }
 
     protected fun sendStoreDisplaySerialInMotor(index: Int, vararg serial: UByte) {
@@ -69,11 +69,11 @@ open class SerialOp(private val serialPort: SerialPort, private val baudRate: In
     }
 
     protected fun sendGetMotorSerialFromMotor() {
-        sendGetDataArray(motorId.toUByte(), 0x70u, 0xd1u, 0x00u);
+        sendGetDataArray(motorId.toUByte(), 0x70u, 0xd1u, 0x00u)
     }
 
     protected fun sendGetMotorSerialFromBattery() {
-        sendGetDataArray(batId.toUByte(), 0x70u, 0xc8u, 0x00u);
+        sendGetDataArray(batId.toUByte(), 0x70u, 0xc8u, 0x00u)
     }
 
     protected fun sendStoreMotorSerialInBattery(vararg serial: UByte) {
@@ -82,6 +82,14 @@ open class SerialOp(private val serialPort: SerialPort, private val baudRate: In
 
     protected fun sendStoreDisableServiceCounter() {
         sendPutData(batId.toUByte(), 0x08u, 0x3bu, 0x00u, 0x00u, 0x00u, 0x00u)
+    }
+
+    protected fun sendStoreClearErrorState() {
+        sendPutData(batId.toUByte(), 0x00u, 0x29u, 0x00u)
+    }
+
+    protected fun sendGetErrorState() {
+        sendGetData(batId.toUByte(), 0x00u, 0x29u)
     }
 
     /**

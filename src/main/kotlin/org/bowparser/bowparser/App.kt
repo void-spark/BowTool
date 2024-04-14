@@ -70,6 +70,7 @@ class App : Application() {
         val scanCU3 = Button("Scan CU3")
         val pairDisplay = Button("Pair display")
         val pairBattery = Button("Pair battery")
+        val clearErr = Button("Clear E0003")
 
         val label = Label("BOW decoder")
         label.font = Font("Arial", 20.0)
@@ -88,7 +89,7 @@ class App : Application() {
         //buttonBox.padding = Insets(15.0, 12.0, 15.0, 12.0)
         buttonBox.spacing = 10.0
         buttonBox.background = Background(BackgroundFill(Color.STEELBLUE, CornerRadii.EMPTY, Insets.EMPTY))
-        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, baudComboBox, scanMotor, scanBattery, scanCU3, pairDisplay, pairBattery)
+        buttonBox.children.addAll(openBinaryButton, openHexButton, portCombBox, baudComboBox, scanMotor, scanBattery, scanCU3, pairDisplay, pairBattery, clearErr)
 
 
         val handoff = CheckBox("HANDOFF")
@@ -222,6 +223,7 @@ class App : Application() {
         scanCU3.setOnAction { event -> doOp({ Scanner(portCombBox.value, baudComboBox.value, 0x0Cu, dataIdsByInt).exec() }) }
         pairDisplay.setOnAction { event -> doOp({ DisplayPairer(portCombBox.value, baudComboBox.value, 1).exec() }) }
         pairBattery.setOnAction { event -> doOp({ BatteryPairer(portCombBox.value, baudComboBox.value).exec() }) }
+        clearErr.setOnAction { event -> doOp({ ClearErr(portCombBox.value, baudComboBox.value).exec() }) }
 
         stage.scene = Scene(pane)
         stage.show()
@@ -235,7 +237,7 @@ class App : Application() {
     private fun filtered(messages: ObservableList<Message>, filter: ObservableValue<Predicate<Message>>): FilteredList<Message> {
         val result = FilteredList(messages)
         result.predicateProperty().bind(filter)
-        return result;
+        return result
     }
 
     private fun col(header: String, width: Double, formatter: (Message) -> String): TableColumn<Message, String> {
