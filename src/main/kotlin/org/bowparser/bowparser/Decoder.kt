@@ -60,12 +60,13 @@ class Decoder(private val commandsByInt: Map<UByte, String>, private val dataIds
 
                 decoded += when (data[1].toInt()) {
                     0x00 -> "ASS:OFF"
-                    0x01 -> "ASS:1"
-                    0x02 -> "ASS:2"
-                    0x03 -> "ASS:3"
+                    0x01 -> "ASS:1 or 2"
+                    0x02 -> "ASS:2 or 3"
+                    0x03 -> "ASS:3 or 4"
                     0x04 -> "ASS:P"
                     0x05 -> "ASS:R"
-                    0x06 -> "ASS:4"
+                    0x06 -> "ASS:4 or 1"
+                    0x07 -> "ASS:5"
                     else -> "ASS:???"
                 }
                 decoded += "(${data[1]}) "
